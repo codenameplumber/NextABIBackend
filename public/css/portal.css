@@ -1,0 +1,399 @@
+/* ===========================================================================
+   NexABI — Client portal
+   ---------------------------------------------------------------------------
+   A buyer does not need a BI tool. They need four answers: what did I buy,
+   what do I owe, when is it due, and who do I call. So this surface has no
+   KPI grid, no insight feed and no charts nobody asked for — just the state
+   of one purchase, told in order.
+
+   Reads the same tokens and the same seeded data as the console.
+   =========================================================================== */
+
+.portal-body {
+  background: var(--bg);
+  overflow-y: auto;
+  font-family: var(--font);
+}
+
+/* ===========================  SHELL  ====================================== */
+
+.pt-head {
+  position: sticky; top: 0; z-index: 40;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(14px) saturate(1.5);
+  -webkit-backdrop-filter: blur(14px) saturate(1.5);
+  border-bottom: 1px solid var(--border);
+}
+.pt-head__top {
+  display: flex; align-items: center; gap: var(--s-4);
+  padding: var(--s-3) var(--s-6);
+  max-width: 1120px; margin-inline: auto;
+}
+.pt-nav {
+  display: flex; gap: var(--s-1);
+  padding: 0 var(--s-6);
+  max-width: 1120px; margin-inline: auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.pt-nav::-webkit-scrollbar { display: none; }
+
+.pt-nav a {
+  position: relative;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 11px var(--s-3) 13px;
+  font-size: var(--t-md); font-weight: 500;
+  color: var(--text-3);
+  white-space: nowrap;
+  transition: color var(--fast);
+}
+.pt-nav a:hover { color: var(--text); }
+.pt-nav a.is-active { color: var(--brand-500); font-weight: 600; }
+.pt-nav a.is-active::after {
+  content: ''; position: absolute; left: var(--s-3); right: var(--s-3); bottom: 0;
+  height: 2px; background: var(--brand-500); border-radius: 2px 2px 0 0;
+}
+.pt-nav a svg { opacity: .75; }
+.pt-nav a.is-active svg { opacity: 1; }
+
+.pt-main {
+  max-width: 1120px; margin-inline: auto;
+  padding: var(--s-6) var(--s-6) var(--s-10);
+  display: grid; gap: var(--s-5);
+}
+
+@media (max-width: 680px) {
+  .pt-head__top, .pt-nav, .pt-main { padding-inline: var(--s-4); }
+}
+
+/* ===========================  STATUS BANNER  ============================= */
+
+.pt-banner {
+  position: relative;
+  border: 1px solid var(--brand-edge);
+  border-radius: var(--r-lg);
+  background: radial-gradient(120% 180% at 0% 0%, var(--brand-glow), transparent 60%), var(--surface);
+  padding: var(--s-5);
+  overflow: hidden;
+}
+.pt-banner__eyebrow {
+  display: flex; align-items: center; gap: 7px;
+  font-size: var(--t-xs); font-weight: 650; letter-spacing: .13em;
+  text-transform: uppercase; color: var(--brand-500);
+}
+.pt-banner__h {
+  font-family: var(--font-display); font-weight: 700;
+  font-size: clamp(21px, 2.6vw, 30px); letter-spacing: -.022em;
+  line-height: 1.18; margin-top: var(--s-3); text-wrap: balance;
+}
+.pt-banner__p {
+  font-size: var(--t-md); color: var(--text-2); line-height: 1.62;
+  margin-top: var(--s-3); max-width: 62ch;
+}
+.pt-banner__p b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ===========================  PROPERTY  ================================== */
+
+.prop-card {
+  display: grid;
+  grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+@media (max-width: 720px) { .prop-card { grid-template-columns: minmax(0, 1fr); } }
+
+/* No stock photography — a generated architectural mark instead. Honest, and
+   it can never show the wrong building. */
+.prop-art {
+  position: relative;
+  min-height: 190px;
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--brand-500) 22%, transparent), transparent 62%),
+    var(--surface-3);
+  display: grid; place-items: center;
+  border-right: 1px solid var(--border);
+}
+@media (max-width: 720px) { .prop-art { border-right: 0; border-bottom: 1px solid var(--border); } }
+.prop-art svg { width: 82px; height: 82px; color: var(--brand-500); opacity: .55; }
+.prop-art__ref {
+  position: absolute; left: var(--s-3); top: var(--s-3);
+  font-family: var(--mono); font-size: var(--t-xs);
+  padding: 3px 8px; border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--bg-deep) 55%, transparent);
+  color: var(--text-2);
+}
+
+.prop-body { padding: var(--s-5); display: grid; gap: var(--s-4); align-content: start; }
+.prop-title { font-size: var(--t-xl); font-weight: 640; letter-spacing: -.02em; }
+.prop-sub { font-size: var(--t-md); color: var(--text-3); margin-top: 4px; }
+
+.prop-facts {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--s-4);
+  border-top: 1px solid var(--border);
+  padding-top: var(--s-4);
+}
+.prop-fact__k { font-size: var(--t-sm); color: var(--text-3); }
+.prop-fact__v {
+  font-size: var(--t-lg); font-weight: 620; margin-top: 3px;
+  font-variant-numeric: tabular-nums; letter-spacing: -.015em;
+}
+
+/* ===========================  PROGRESS  ================================== */
+
+.pay-progress { display: grid; gap: 10px; }
+.pay-bar {
+  height: 10px; border-radius: var(--r-full);
+  background: var(--surface-3); overflow: hidden;
+  display: flex; gap: 2px;
+}
+.pay-bar > i { display: block; height: 100%; }
+.pay-bar > i.paid { background: var(--pos); }
+.pay-bar > i.due  { background: var(--sev-critical); }
+.pay-bar > i.next { background: var(--brand-500); }
+
+.pay-legend {
+  display: flex; flex-wrap: wrap; gap: var(--s-4);
+  font-size: var(--t-sm); color: var(--text-3);
+}
+.pay-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.pay-legend i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+
+/* ===========================  TIMELINE  ================================== */
+
+.tl { display: grid; gap: 0; }
+.tl-item {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: var(--s-4);
+  padding-bottom: var(--s-5);
+  position: relative;
+}
+.tl-item:last-child { padding-bottom: 0; }
+.tl-item::before {
+  content: ''; position: absolute;
+  left: 12.5px; top: 24px; bottom: 0; width: 1px;
+  background: var(--border);
+}
+.tl-item:last-child::before { display: none; }
+
+.tl-dot {
+  width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--surface-3); color: var(--text-3);
+  border: 1px solid var(--border);
+  position: relative; z-index: 1;
+}
+.tl-item.is-done .tl-dot { background: var(--pos-soft); color: var(--pos); border-color: transparent; }
+.tl-item.is-now  .tl-dot { background: var(--brand-500); color: #171614; border-color: transparent; }
+.tl-item.is-now::before { background: var(--border); }
+
+.tl-t { font-size: var(--t-md); font-weight: 600; }
+.tl-item.is-todo .tl-t { color: var(--text-3); font-weight: 500; }
+.tl-d { font-size: var(--t-base); color: var(--text-3); margin-top: 3px; line-height: 1.55; }
+.tl-when { font-size: var(--t-sm); color: var(--text-4); margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+/* ===========================  AGENT  ===================================== */
+
+.agent-card {
+  display: flex; align-items: center; gap: var(--s-4);
+  padding: var(--s-4) var(--s-5);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+.agent-avatar {
+  width: 46px; height: 46px; border-radius: 50%; flex: none;
+  display: grid; place-items: center;
+  font-weight: 650; font-size: 15px;
+  background: var(--brand-glow); color: var(--brand-500);
+}
+
+/* ===========================  DOCUMENTS  ================================= */
+
+.doc-row {
+  display: flex; align-items: center; gap: var(--s-4);
+  padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--border);
+  transition: background var(--fast);
+}
+.doc-row:last-child { border-bottom: none; }
+.doc-row:hover { background: var(--hover); }
+.doc-icon {
+  width: 34px; height: 34px; border-radius: var(--r-md); flex: none;
+  display: grid; place-items: center;
+  background: var(--surface-3); color: var(--text-2);
+}
+.doc-row.is-ready .doc-icon { background: var(--pos-soft); color: var(--pos); }
+.doc-name { font-size: var(--t-md); font-weight: 550; }
+.doc-meta { font-size: var(--t-sm); color: var(--text-3); margin-top: 2px; }
+
+/* ===========================  SUPPORT  =================================== */
+
+.ticket {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  padding: var(--s-4) var(--s-5);
+}
+.ticket + .ticket { margin-top: var(--s-3); }
+.ticket__h { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.ticket__t { font-size: var(--t-md); font-weight: 600; }
+.ticket__b { font-size: var(--t-base); color: var(--text-2); line-height: 1.6; margin-top: 8px; }
+.ticket__reply {
+  margin-top: var(--s-3); padding: var(--s-3) var(--s-4);
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+  font-size: var(--t-base); color: var(--text-2); line-height: 1.6;
+}
+
+.faq details {
+  border-bottom: 1px solid var(--border);
+  padding: var(--s-4) 0;
+}
+.faq details:last-child { border-bottom: none; }
+.faq summary {
+  cursor: pointer; list-style: none;
+  font-size: var(--t-md); font-weight: 550;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-4);
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after {
+  content: '+'; font-size: 18px; color: var(--text-3); flex: none; line-height: 1;
+}
+.faq details[open] summary::after { content: '−'; color: var(--brand-500); }
+.faq details[open] summary { color: var(--brand-500); }
+.faq p { font-size: var(--t-base); color: var(--text-2); line-height: 1.65; margin-top: var(--s-3); max-width: 66ch; }
+
+/* ===========================  SECTION HEAD  ============================== */
+
+.pt-sec {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--s-4); flex-wrap: wrap;
+  margin-bottom: var(--s-3);
+}
+.pt-sec h2 {
+  font-size: var(--t-lg); font-weight: 620; letter-spacing: -.015em;
+}
+.pt-sec p { font-size: var(--t-sm); color: var(--text-3); margin-top: 2px; }
+
+.pt-grid-2 { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--s-5); align-items: start; }
+@media (max-width: 900px) { .pt-grid-2 { grid-template-columns: minmax(0, 1fr); } }
+
+/* The page note sits flush with the rest of the column, and slightly quieter
+   than in the console — a buyer reads top-to-bottom, they are not scanning. */
+.pt-note { margin-bottom: calc(var(--s-2) * -1); }
+
+/* ===========================  PAYMENT SUMMARY  ===========================
+   Five equal stats in a row made the reader do the ranking. A buyer opening
+   this page wants ONE number — what is still owed — and then context. So the
+   balance is the hero, the bar is the context, and the rest are supporting
+   facts sized like supporting facts.
+   ========================================================================= */
+
+.pay-sum {
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.pay-sum__hero { padding: var(--s-5); display: grid; gap: var(--s-4); }
+
+.pay-sum__top {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: var(--s-4); flex-wrap: wrap;
+}
+.pay-sum__k {
+  font-size: var(--t-xs); font-weight: 650; letter-spacing: .13em;
+  text-transform: uppercase; color: var(--text-3);
+}
+.pay-sum__v {
+  /* Exact to the naira — a buyer checking what they owe wants the real figure,
+     not a rounded one — so the type is sized to fit nine digits comfortably. */
+  font-size: clamp(25px, 3.2vw, 34px); font-weight: 650;
+  letter-spacing: -.032em; line-height: 1;
+  font-variant-numeric: tabular-nums;
+  margin-top: 10px;
+}
+.pay-sum__v.is-clear { color: var(--pos); }
+
+.pay-sum__pct {
+  text-align: right; flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.pay-sum__pct b {
+  display: block; font-size: var(--t-2xl); font-weight: 640; letter-spacing: -.028em;
+  line-height: 1;
+}
+.pay-sum__pct span { font-size: var(--t-sm); color: var(--text-3); }
+
+.pay-sum__meta {
+  font-size: var(--t-md); color: var(--text-2); line-height: 1.6;
+}
+.pay-sum__meta b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Supporting facts sit on their own band, clearly secondary. */
+.pay-sum__facts {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--s-4) var(--s-5);
+  padding: var(--s-4) var(--s-5);
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.pay-sum__fact { display: grid; gap: 5px; }
+.pay-sum__fact dt { font-size: var(--t-sm); color: var(--text-3); }
+.pay-sum__fact dd {
+  margin: 0; font-size: var(--t-lg); font-weight: 620;
+  letter-spacing: -.015em; font-variant-numeric: tabular-nums;
+}
+.pay-sum__fact dd.neg { color: var(--neg); }
+.pay-sum__fact dd.pos { color: var(--pos); }
+
+/* ===========================  FORM  =====================================
+   The support form's controls were silently not controls at all. Now that they
+   are, give them room: a comfortable target height and a textarea that looks
+   like somewhere you would actually type a paragraph.
+   ========================================================================= */
+
+.form-grid { display: grid; gap: var(--s-5); }
+
+.field textarea {
+  min-height: 118px;
+  padding: var(--s-3) var(--s-4);
+  line-height: 1.6;
+  resize: vertical;
+  font-family: var(--font);
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-md);
+  color: var(--text);
+  font-size: var(--t-md);
+  width: 100%;
+  transition: border-color var(--fast), box-shadow var(--fast);
+}
+.field textarea:hover { border-color: var(--border-strong); }
+.field textarea:focus {
+  outline: none;
+  border-color: var(--brand-500);
+  box-shadow: 0 0 0 3px var(--brand-glow);
+}
+.field textarea::placeholder { color: var(--text-4); }
+
+/* Native select needs the arrow room and the same resting weight as an input. */
+.field select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none' stroke='%23898781' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--s-4) center;
+  padding-right: var(--s-7);
+  cursor: pointer;
+}
+
+.form-foot {
+  display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap;
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--border);
+}

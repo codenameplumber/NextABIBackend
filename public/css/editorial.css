@@ -1,0 +1,527 @@
+/* ===========================================================================
+   NexABI — Editorial layer
+   ---------------------------------------------------------------------------
+   The marketing register: landing page, auth, and the client portal's public
+   edges. Reads from the SAME tokens as the console, so the brand is one thing,
+   but it sets type at a completely different scale.
+
+   Marketing persuades; product informs. A landing page that looks like a
+   dashboard sells nothing, and a dashboard that looks like a landing page
+   holds nothing. These are two jobs and they get two treatments.
+
+   RULES CARRIED OVER FROM THE CONSOLE
+   · Gold is reserved for emphasis and the intelligence layer. It is never a
+     decorative wash and never a severity colour.
+   · Figures are RULED, not boxed. Boxes everywhere is the default look of a
+     template; rules and whitespace read as considered.
+   =========================================================================== */
+
+.editorial {
+  font-family: var(--font);
+  background: var(--bg-deep);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.site-wrap { min-height: 100vh; display: flex; flex-direction: column; }
+
+.container {
+  width: 100%;
+  max-width: 1180px;
+  margin-inline: auto;
+  padding-inline: var(--s-6);
+}
+.container--wide { max-width: 1400px; }
+.container--narrow { max-width: 760px; }
+
+/* ===========================  TYPE  ======================================= */
+
+.display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -.028em;
+  font-size: clamp(38px, 6.2vw, 72px);
+  text-wrap: balance;
+}
+.display--sm { font-size: clamp(28px, 3.6vw, 42px); line-height: 1.08; }
+
+.headline {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: 1.14;
+  font-size: clamp(24px, 3vw, 34px);
+  text-wrap: balance;
+}
+
+.lede {
+  font-size: clamp(16px, 1.5vw, 19px);
+  line-height: 1.62;
+  color: var(--text-2);
+  font-weight: 400;
+}
+.measure { max-width: 62ch; }
+.measure-tight { max-width: 48ch; }
+
+.kicker {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: var(--t-xs); font-weight: 600;
+  letter-spacing: .15em; text-transform: uppercase;
+  color: var(--brand-500);
+}
+.kicker::before {
+  content: ''; width: 18px; height: 1px; background: var(--brand-500); opacity: .6;
+}
+
+/* Rhythm: sections breathe, but the rule between them is the only divider.
+   Boxes inside boxes inside ruled sections is three levels of containment
+   doing one job. */
+.section { padding-block: clamp(52px, 7vw, 92px); }
+.section--tight { padding-block: clamp(36px, 4.5vw, 56px); }
+.section + .section { border-top: 1px solid var(--border); }
+
+/* Space between a section's intro and its content, consistently. */
+.section > .container > .kicker + .headline { margin-top: var(--s-4); }
+
+.rule { height: 1px; background: var(--border); border: 0; }
+
+/* ===========================  HEADER  ===================================== */
+
+.site-head {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: var(--s-4);
+  padding: var(--s-3) var(--s-6);
+  background: color-mix(in srgb, var(--bg-deep) 86%, transparent);
+  backdrop-filter: blur(16px) saturate(1.5);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  display: inline-flex; align-items: center; gap: 10px;
+  flex: none;
+}
+.brand-mark {
+  width: 30px; height: 30px; border-radius: 9px; flex: none;
+  display: grid; place-items: center;
+  background: var(--brand-500); color: #171614;
+}
+.brand-text { display: grid; gap: 1px; line-height: 1; }
+.brand-name { font-size: 17px; font-weight: 650; letter-spacing: -.03em; }
+.brand-tag {
+  font-size: 8px; font-weight: 600; letter-spacing: .17em;
+  text-transform: uppercase; color: var(--text-3); white-space: nowrap;
+}
+
+.site-nav { display: flex; gap: var(--s-5); margin-left: var(--s-6); }
+.site-nav a {
+  font-size: var(--t-md); font-weight: 500; color: var(--text-2);
+  padding: 6px 0; position: relative;
+  transition: color var(--fast);
+}
+.site-nav a:hover { color: var(--text); }
+.site-nav a::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1.5px;
+  background: var(--brand-500); transform: scaleX(0); transform-origin: left;
+  transition: transform var(--base) var(--ease);
+}
+.site-nav a:focus-visible::after { transform: scaleX(1); }
+.site-nav a:hover::after { transform: scaleX(1); }
+
+@media (max-width: 880px) { .site-nav { display: none; } }
+
+/* ===========================  HERO  ======================================= */
+
+.hero {
+  position: relative;
+  padding-block: clamp(48px, 7vw, 92px) clamp(40px, 5vw, 72px);
+  overflow: hidden;
+}
+/* A single soft gold bloom. One light source, not a gradient soup. */
+.hero::before {
+  content: ''; position: absolute; inset: -30% 30% 40% -20%;
+  background: radial-gradient(closest-side, var(--brand-glow), transparent 70%);
+  pointer-events: none;
+  opacity: .9;
+}
+.hero > * { position: relative; }
+
+/* Fine grain over flat dark fields — stops large areas reading as dead space. */
+.grain::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; opacity: .028;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.ed-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+  gap: clamp(28px, 5vw, 64px);
+  align-items: center;
+}
+.ed-split--top { align-items: start; }
+@media (max-width: 940px) { .ed-split { grid-template-columns: minmax(0, 1fr); } }
+
+/* Ruled figures — the editorial alternative to a row of boxes. */
+.ed-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--s-6);
+  border-top: 1px solid var(--border);
+  padding-top: var(--s-5);
+}
+.ed-figures > div { padding-right: var(--s-4); }
+.ed-figures .n {
+  font-family: var(--font-display);
+  font-size: clamp(26px, 3vw, 36px);
+  font-weight: 700; letter-spacing: -.03em; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.ed-figures .k {
+  font-size: var(--t-sm); color: var(--text-3); margin-top: 8px; line-height: 1.45;
+  max-width: 22ch;
+}
+
+/* ===========================  MEDIA  ====================================== */
+
+.shot {
+  position: relative;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  border: 1px solid var(--border-2);
+  background: var(--surface);
+  box-shadow: var(--sh-4);
+}
+.shot img { width: 100%; height: auto; display: block; }
+.shot--tilt { transform: perspective(1800px) rotateY(-2deg); }
+
+.shot-cap {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px var(--s-4);
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: var(--t-sm); color: var(--text-3);
+}
+.shot-tag {
+  position: absolute; top: 12px; left: 12px; z-index: 2;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--bg-deep) 78%, transparent);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--brand-edge);
+  font-size: var(--t-xs); font-weight: 600; color: var(--brand-500);
+}
+.shot-tag .pulse {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--brand-500);
+  animation: pulse 2s var(--ease) infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+
+.fig-cap {
+  font-size: var(--t-sm); color: var(--text-3);
+  line-height: 1.55; margin-top: var(--s-3); max-width: 46ch;
+}
+
+/* ===========================  THE LOOP  =================================== */
+
+.loop {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--surface);
+}
+.loop-step {
+  padding: var(--s-5);
+  border-right: 1px solid var(--border);
+  position: relative;
+  transition: background var(--base);
+}
+.loop-step:last-child { border-right: 0; }
+.loop-step:hover { background: var(--surface-2); }
+.loop-step__n {
+  font-family: var(--mono); font-size: var(--t-xs); font-weight: 500;
+  color: var(--brand-500); letter-spacing: .1em;
+}
+.loop-step__t {
+  font-size: var(--t-lg); font-weight: 620; letter-spacing: -.015em;
+  margin-top: var(--s-3);
+}
+.loop-step__d {
+  font-size: var(--t-base); color: var(--text-2); line-height: 1.6; margin-top: 7px;
+}
+.loop-step--live { background: var(--brand-glow); }
+.loop-step--live .loop-step__t { color: var(--brand-500); }
+
+@media (max-width: 900px) {
+  .loop { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .loop-step:nth-child(2n) { border-right: 0; }
+  .loop-step:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
+}
+@media (max-width: 560px) {
+  .loop { grid-template-columns: minmax(0, 1fr); }
+  .loop-step { border-right: 0; border-bottom: 1px solid var(--border); }
+  .loop-step:last-child { border-bottom: 0; }
+}
+
+/* ===========================  PORTAL CARDS  =============================== */
+
+.portals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-4); }
+@media (max-width: 860px) { .portals { grid-template-columns: minmax(0, 1fr); } }
+
+.portal {
+  display: block;
+  position: relative;
+  padding: var(--s-6);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color var(--base), transform var(--base), box-shadow var(--base);
+}
+.portal:hover {
+  border-color: var(--brand-edge);
+  transform: translateY(-2px);
+  box-shadow: var(--sh-3);
+}
+.portal:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+.portal__icon {
+  width: 40px; height: 40px; border-radius: var(--r-md);
+  display: grid; place-items: center;
+  background: var(--brand-glow); color: var(--brand-500);
+  margin-bottom: var(--s-4);
+}
+.portal__t { font-size: var(--t-xl); font-weight: 640; letter-spacing: -.02em; }
+.portal__who {
+  font-size: var(--t-xs); font-weight: 600; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--text-4); margin-top: 6px;
+}
+.portal__d { font-size: var(--t-md); color: var(--text-2); line-height: 1.6; margin-top: var(--s-3); }
+.portal__list {
+  display: grid; gap: 7px; margin-top: var(--s-4);
+  font-size: var(--t-base); color: var(--text-3);
+}
+.portal__list li { display: flex; align-items: flex-start; gap: 9px; }
+.portal__list svg { flex: none; margin-top: 2px; color: var(--brand-500); opacity: .8; }
+.portal__go {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: var(--s-5); font-weight: 600; color: var(--brand-500); font-size: var(--t-md);
+}
+.portal:hover .portal__go svg { transform: translateX(3px); }
+.portal__go svg { transition: transform var(--base) var(--ease); }
+
+/* ===========================  FEATURE GRID  ============================== */
+
+.feat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.feat {
+  background: var(--surface);
+  padding: var(--s-5);
+  transition: background var(--base);
+}
+.feat:hover { background: var(--surface-2); }
+.feat__i { color: var(--brand-500); margin-bottom: var(--s-3); }
+.feat__t { font-size: var(--t-md); font-weight: 620; }
+.feat__d { font-size: var(--t-base); color: var(--text-2); line-height: 1.6; margin-top: 6px; }
+
+/* ===========================  QUOTE / CALLOUT  =========================== */
+
+/* No rule. The serif at this size is already the loudest thing on the page —
+   a gold bar next to it is two shouts. */
+.callout { padding: var(--s-2) 0; }
+.callout p {
+  font-family: var(--font-display);
+  font-size: clamp(19px, 2.2vw, 26px);
+  font-weight: 700; line-height: 1.32; letter-spacing: -.02em;
+  text-wrap: balance;
+}
+.callout cite {
+  display: block; margin-top: var(--s-3);
+  font-style: normal; font-size: var(--t-sm); color: var(--text-3);
+}
+
+/* ===========================  CTA BAND  ================================== */
+
+.cta-band {
+  position: relative;
+  border: 1px solid var(--brand-edge);
+  border-radius: var(--r-xl);
+  background: radial-gradient(130% 170% at 50% 0%, var(--brand-glow), transparent 62%), var(--surface);
+  padding: clamp(36px, 5vw, 60px);
+  overflow: hidden;
+  text-align: center;
+  display: grid; justify-items: center; gap: 0;
+}
+.cta-band .measure { text-align: center; }
+
+/* ===========================  FOOTER  ==================================== */
+
+.site-foot {
+  margin-top: auto;
+  border-top: 1px solid var(--border);
+  padding-block: var(--s-7) var(--s-6);
+  background: var(--bg-deep);
+}
+.foot-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr));
+  gap: var(--s-6);
+}
+@media (max-width: 780px) { .foot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.foot-col h4 {
+  font-size: var(--t-xs); font-weight: 600; letter-spacing: .13em;
+  text-transform: uppercase; color: var(--text-4); margin-bottom: var(--s-3);
+}
+.foot-col a, .foot-col li {
+  display: block; font-size: var(--t-base); color: var(--text-3);
+  padding: 4px 0; transition: color var(--fast);
+}
+.foot-col a:hover { color: var(--brand-500); }
+.foot-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-4);
+  flex-wrap: wrap;
+  margin-top: var(--s-7); padding-top: var(--s-4);
+  border-top: 1px solid var(--border);
+  font-size: var(--t-sm); color: var(--text-4);
+}
+
+/* ===========================  AUTH  ====================================== */
+
+.auth-shell {
+  min-height: 100vh; min-height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+}
+@media (max-width: 940px) { .auth-shell { grid-template-columns: minmax(0, 1fr); } }
+
+.auth-form-side {
+  display: grid; align-content: center; justify-items: stretch;
+  padding: var(--s-7) clamp(24px, 5vw, 72px);
+  background: var(--bg);
+  min-width: 0;
+}
+.auth-form { width: 100%; max-width: 400px; margin-inline: auto; }
+
+.auth-aside {
+  position: relative;
+  padding: var(--s-7) clamp(24px, 4vw, 56px);
+  background: var(--bg-deep);
+  border-left: 1px solid var(--border);
+  display: grid; align-content: center;
+  overflow: hidden;
+}
+.auth-aside::before {
+  content: ''; position: absolute; inset: -20% -10% 40% 20%;
+  background: radial-gradient(closest-side, var(--brand-glow), transparent 70%);
+  pointer-events: none;
+}
+.auth-aside > * { position: relative; }
+@media (max-width: 940px) { .auth-aside { display: none; } }
+
+.field { display: grid; gap: 7px; margin-bottom: var(--s-4); }
+.field label { font-size: var(--t-base); font-weight: 550; color: var(--text-2); }
+.field input, .field select {
+  height: 42px; padding: 0 var(--s-4);
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-md);
+  font-size: var(--t-md);
+  color: var(--text);
+  transition: border-color var(--fast), box-shadow var(--fast);
+  width: 100%;
+}
+.field input:hover { border-color: var(--border-strong); }
+.field input:focus, .field select:focus {
+  outline: none;
+  border-color: var(--brand-500);
+  box-shadow: 0 0 0 3px var(--brand-glow);
+}
+.field input::placeholder { color: var(--text-4); }
+.field__hint { font-size: var(--t-sm); color: var(--text-4); }
+.field__err { font-size: var(--t-sm); color: var(--neg); display: none; }
+.field.is-invalid input { border-color: var(--neg); }
+.field.is-invalid .field__err { display: block; }
+
+/* Role chooser — two big honest targets, not a dropdown. */
+.role-pick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-3); }
+.role-opt {
+  position: relative;
+  display: block; cursor: pointer;
+  padding: var(--s-4);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  transition: all var(--fast);
+}
+.role-opt:hover { border-color: var(--border-strong); }
+.role-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.role-opt__t { font-size: var(--t-md); font-weight: 620; display: flex; align-items: center; gap: 8px; }
+.role-opt__d { font-size: var(--t-sm); color: var(--text-3); margin-top: 5px; line-height: 1.45; }
+.role-opt:has(input:checked) {
+  border-color: var(--brand-500);
+  background: var(--brand-glow);
+  box-shadow: 0 0 0 3px var(--brand-glow);
+}
+.role-opt:has(input:checked) .role-opt__t { color: var(--brand-500); }
+.role-opt:has(input:focus-visible) { outline: 2px solid var(--brand-500); outline-offset: 2px; }
+
+.demo-note {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: var(--s-3) var(--s-4);
+  border: 1px dashed var(--border-2);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  font-size: var(--t-sm); color: var(--text-3); line-height: 1.55;
+  margin-bottom: var(--s-5);
+}
+.demo-note b { color: var(--text-2); font-weight: 600; }
+.demo-note svg { flex: none; margin-top: 1px; color: var(--brand-500); }
+
+.auth-alt {
+  margin-top: var(--s-5); padding-top: var(--s-4);
+  border-top: 1px solid var(--border);
+  font-size: var(--t-base); color: var(--text-3); text-align: center;
+}
+.auth-alt a { color: var(--brand-500); font-weight: 550; }
+.auth-alt a:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+/* ===========================  UTILITIES  ================================= */
+
+.mt-8  { margin-top: 8px; }  .mt-12 { margin-top: 12px; }
+.mt-16 { margin-top: 16px; } .mt-20 { margin-top: 20px; }
+.mt-24 { margin-top: 24px; } .mt-32 { margin-top: 32px; }
+.mt-40 { margin-top: 40px; } .mt-48 { margin-top: 48px; }
+.mb-16 { margin-bottom: 16px; } .mb-24 { margin-bottom: 24px; }
+.g-12 { gap: 12px; } .g-16 { gap: 16px; }
+
+.tiny { font-size: var(--t-xs); }
+.dim  { color: var(--text-3); }
+.strong { font-weight: 600; }
+.center-text { text-align: center; }
+
+.pill-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 11px; border-radius: var(--r-full);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: var(--t-sm); color: var(--text-2);
+}
+.pill svg { color: var(--brand-500); }
+
+@media (max-width: 680px) {
+  .container { padding-inline: var(--s-4); }
+  .ed-figures > div { padding-right: 0; }
+}

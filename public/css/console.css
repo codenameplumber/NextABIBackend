@@ -1,0 +1,89 @@
+/**
+ * Console additions.
+ *
+ * Everything the server-rendered build needs that the prototype built
+ * imperatively in JS. Kept in its own file so the ported design system stays
+ * byte-identical to the one that was reviewed and signed off.
+ */
+
+/* ------------------------------------------------------------- user menu */
+
+.usermenu {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding-left: var(--s-2);
+}
+
+.usermenu__text {
+  display: none;
+  line-height: 1.25;
+}
+
+@media (min-width: 900px) {
+  .usermenu__text { display: block; }
+}
+
+.usermenu__name {
+  font-size: var(--t-sm);
+  font-weight: 560;
+  color: var(--text-1);
+  white-space: nowrap;
+}
+
+.usermenu__org {
+  font-size: var(--t-xs);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+/* ----------------------------------------------------------- chart hosts */
+
+/* Charts are drawn client-side into these. The min-height stops the page
+   jumping between first paint and the draw — a 240px hole that fills is far
+   less jarring than 240px of content that shunts downward. */
+.chartbox {
+  position: relative;
+  min-height: 120px;
+}
+
+.chartbox--sm { min-height: 90px; }
+.chartbox--lg { min-height: 260px; }
+
+.chartbox > figure > div > svg { display: block; width: 100%; height: auto; }
+
+/* ---------------------------------------------------------- form pieces */
+
+.field { display: block; margin-bottom: var(--s-4); }
+
+.field__label {
+  display: block;
+  font-size: var(--t-sm);
+  font-weight: 560;
+  color: var(--text-2);
+  margin-bottom: var(--s-2);
+}
+
+.field__hint {
+  display: block;
+  font-size: var(--t-xs);
+  color: var(--text-3);
+  margin-top: var(--s-2);
+}
+
+.field__error {
+  display: block;
+  font-size: var(--t-xs);
+  color: var(--neg);
+  margin-top: var(--s-2);
+}
+
+/* ------------------------------------------------------------ utilities */
+
+.busy { opacity: .55; pointer-events: none; transition: opacity .15s ease; }
+
+/* Livewire sets this while a request is in flight. Without it, clicking Apply
+   looks like nothing happened for the second the engine takes to re-run. */
+[wire\:loading] { display: none; }
+
+.stack-6 > * + * { margin-top: var(--s-6); }
