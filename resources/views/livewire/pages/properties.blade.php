@@ -37,6 +37,188 @@
 
     <livewire:area-insights area="properties" />
 
+    {{-- ────────────────────────────────────────────── add or edit a unit ──
+         Photography accepts both a file and a link, deliberately. An agency
+         with its stock already shot and on a CDN should not have to re-upload
+         700 files to use this; an agent with a photo on their phone should not
+         have to find somewhere to host it first. Both end up in the same
+         column and PropertyPhotos::resolve() sorts out which is which. --}}
+
+    <x-card title="Stock" sub="Add a unit, or edit one already listed" flush>
+        <x-slot:actions>
+            @unless ($adding)
+                <button class="btn btn--sm btn--primary" wire:click="addListing">
+                    <x-icon name="plus" size="14" /><span>Add a property</span>
+                </button>
+            @endunless
+        </x-slot:actions>
+
+        @if ($adding)
+            <form class="recform" wire:submit="saveListing">
+                <div class="recform__grid">
+                    <div class="field fgrid--full">
+                        <label for="p-title">Title</label>
+                        <input id="p-title" type="text" wire:model="f_title"
+                               placeholder="3-Bedroom Apartment at Ikate">
+                        @error('f_title')<span class="field__err">{{ $message }}</span>@enderror
+                    </div>
+
+                    <div class="field">
+                        <label for="p-type">Type</label>
+                        <select id="p-type" wire:model="f_type" class="field-select">
+                            @foreach ($types as $t)
+                                <option value="{{ $t }}">{{ $t }}</option>
+                            @endforeach
+                        </select>
+                        @error('f_type')<span class="field__err">{{ $message }}</span>@enderror
+                    </div>
+
+                    <div class="field">
+                        <label for="p-loc">Location</label>
+                        <select id="p-loc" wire:model="f_location" class="field-select">
+                            <option value="">Choose…</option>
+                            @foreach ($locations as $l)
+                                <option value="{{ $l }}">{{ $l }}</option>
+                            @endforeach
+                        </select>
+                        @error('f_location')<span class="field__err">{{ $message }}</span>@enderror
+                    </div>
+
+                    <div class="field">
+                        <label for="p-beds">Bedrooms <span class="t-4">(0 for land)</span></label>
+                        <input id="p-beds" type="number" min="0" max="20" wire:model="f_bedrooms">
+                        @error('f_bedrooms')<span class="field__err">{{ $message }}</span>@enderror
+                    </div>
+
+                    <div class="field">
+                        <label for="p-size">Size (m²)</label>
+                        <input id="p-size" type="number" min="0" wire:model="f_size">
+                        @error('f_size')<span class="field__err">{{ $message }}</span>@enderror
+                    </div>
+
+                    <div class="field">
+                        <label for="p-price">Price (₦)</label>
+                        <input id="p-price" type="number" step="100000" min="1" wire:model.live.debounce.400ms="f_price">
+                        @error('f_price')<span class="field__err">{{ $message }}</span>@enderror
+                    </div>
+
+                    <div class="field">
+                        <label for="p-comm">Commission (%)</label>
+                        <input id="p-comm" type="number" step="0.1" min="0" max="15" wire:model="f_commission">
+                        <span class="field__hint">Capped at 15%. Frozen onto each sale at approval.</span>
+                        @error('f_commission')<span class="field__err">{{ $message }}</span>@enderror
+                    </div>
+
+                    <div class="field">
+                        <label for="p-min">Shortest term (months)</label>
+                        <input id="p-min" type="number" min="1" max="60" wire:model.live="f_minMonths">
+                        @error('f_minMonths')<span class="field__err">{{ $message }}</span>@enderror
+                    </div>
+
+                    <div class="field">
+                        <label for="p-max">Longest term (months)</label>
+                        <input id="p-max" type="number" min="1" max="60" wire:model.live="f_maxMonths">
+                        @error('f_maxMonths')<span class="field__err">{{ $message }}</span>@enderror
+                    </div>
+
+                    <div class="field fgrid--full">
+                        <label for="p-desc">Description <span class="t-4">(optional)</span></label>
+                        <textarea id="p-desc" rows="2" wire:model="f_description"></textarea>
+                        @error('f_description')<span class="field__err">{{ $message }}</span>@enderror
+                    </div>
+                </div>
+
+                {{-- The monthly figure, live. It is the number a buyer decides
+                     on, so whoever lists the unit should see it too. --}}
+                @if (is_numeric($f_price) && $f_price > 0 && (int) $f_maxMonths > 0)
+                    <div class="blocker" style="border-color:var(--brand-edge);background:var(--brand-glow);margin-top:var(--s-4)">
+                        <x-icon name="info" size="15" />
+                        <span>
+                            Buyers will see <b>{{ Fmt::money((float) $f_price / max(1, (int) $f_maxMonths)) }}</b>
+                            a month over {{ (int) $f_maxMonths }} months, up to
+                            <b>{{ Fmt::money((float) $f_price / max(1, (int) $f_minMonths)) }}</b>
+                            over {{ (int) $f_minMonths }}.
+                        </span>
+                    </div>
+                @endif
+
+                {{-- ---- photography ---- --}}
+                <div class="imgpick">
+                    <div class="eyebrow">Photographs</div>
+
+                    <div class="imgpick__grid">
+                        @foreach ($images as $i => $img)
+                            <figure class="imgpick__it" wire:key="img-{{ $i }}">
+                                <img src="{{ \App\Support\PropertyPhotos::resolve($img) }}" alt="">
+                                <figcaption>{{ \Illuminate\Support\Str::startsWith($img, 'http') ? 'link' : 'uploaded' }}</figcaption>
+                                <button type="button" class="imgpick__x" wire:click="removeImage({{ $i }})"
+                                        aria-label="Remove this image">
+                                    <x-icon name="x" size="12" />
+                                </button>
+                            </figure>
+                        @endforeach
+
+                        @foreach ($uploads as $i => $up)
+                            <figure class="imgpick__it is-new" wire:key="up-{{ $i }}">
+                                @if (method_exists($up, 'temporaryUrl'))
+                                    <img src="{{ $up->temporaryUrl() }}" alt="">
+                                @endif
+                                <figcaption>ready to save</figcaption>
+                                <button type="button" class="imgpick__x" wire:click="removeUpload({{ $i }})"
+                                        aria-label="Remove this upload">
+                                    <x-icon name="x" size="12" />
+                                </button>
+                            </figure>
+                        @endforeach
+
+                        @if (empty($images) && empty($uploads))
+                            <p class="t-sm t-3" style="margin:0">
+                                None yet. Without a photograph the catalogue draws the unit instead —
+                                which is honest, and can never show the wrong building.
+                            </p>
+                        @endif
+                    </div>
+
+                    <div class="imgpick__controls">
+                        <label class="btn btn--sm btn--ghost">
+                            <x-icon name="upload" size="13" />
+                            <span>Choose files</span>
+                            <input type="file" wire:model="uploads" multiple accept="image/*" hidden>
+                        </label>
+
+                        <span class="t-sm t-3" wire:loading wire:target="uploads">Uploading…</span>
+
+                        <span class="grow"></span>
+
+                        <input class="input" type="url" style="min-width:230px"
+                               wire:model="imageUrl" placeholder="…or paste an image link">
+                        <button type="button" class="btn btn--sm btn--ghost" wire:click="addImageUrl">
+                            <span>Add link</span>
+                        </button>
+                    </div>
+
+                    @error('uploads.*')<span class="field__err">{{ $message }}</span>@enderror
+                    @error('imageUrl')<span class="field__err">{{ $message }}</span>@enderror
+                </div>
+
+                <div class="recform__foot">
+                    <label class="row-2 t-sm t-2" style="gap:var(--s-2)">
+                        <input type="checkbox" wire:model="f_listed">
+                        <span>Visible in the public catalogue</span>
+                    </label>
+                    <span class="grow"></span>
+                    <button type="button" class="btn btn--sm btn--ghost" wire:click="cancelListing">Cancel</button>
+                    <button type="submit" class="btn btn--sm btn--primary"
+                            wire:loading.attr="disabled" wire:target="saveListing, uploads">
+                        <x-icon name="check" size="14" />
+                        <span>{{ $editing ? 'Save changes' : 'Add the property' }}</span>
+                    </button>
+                </div>
+            </form>
+        @endif
+    </x-card>
+
+
     {{-- ------------------------------------------------ demand analysis -- --}}
 
     <div class="grid g-2">
@@ -232,6 +414,18 @@
                         @endif
                     </div>
                 </div>
+
+                {{-- Editing opens the form at the top of the page and closes
+                     the canvas, rather than nesting a second form inside it:
+                     the photograph picker needs room, and a form inside a
+                     360px panel is a form nobody completes. --}}
+                <footer class="overlay__foot">
+                    <span class="t-sm t-3">{{ $detail->ref }}</span>
+                    <span class="grow"></span>
+                    <button class="btn btn--sm btn--primary" wire:click="editListing({{ $detail->id }})">
+                        <x-icon name="settings" size="13" /><span>Edit this listing</span>
+                    </button>
+                </footer>
             </div>
         </div>
     @endif

@@ -2,11 +2,11 @@
     // Theme is read from the cookie and stamped on <html> before any CSS
     // parses. Doing it in JS after load produces a flash of the wrong
     // background on every navigation, which reads as a broken product.
-    $theme = request()->cookie('nexabi_theme', 'dark');
+    $theme = request()->cookie('nexabi_theme', 'light');
     $rail = request()->cookie('nexabi_rail') === '1';
 @endphp
 <!DOCTYPE html>
-<html lang="en" data-theme="{{ $theme === 'light' ? 'light' : 'dark' }}">
+<html lang="en" data-theme="{{ $theme === 'dark' ? 'dark' : 'light' }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -20,7 +20,8 @@
     <link rel="stylesheet" href="{{ asset('css/components.css') }}">
     <link rel="stylesheet" href="{{ asset('css/views.css') }}">
     <link rel="stylesheet" href="{{ asset('css/console.css') }}">
-    <link rel="icon" href="{{ asset('favicon.ico') }}">
+    <link rel="icon" type="image/png" href="{{ asset('img/icons.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('img/icons.png') }}">
 
     @livewireStyles
 </head>

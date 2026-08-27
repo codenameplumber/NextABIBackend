@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToTenant;
+use App\Support\Nigeria;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -34,6 +35,40 @@ class Lead extends Model
     public function daysSinceContact(): int
     {
         return $this->last_contact_at ? (int) $this->last_contact_at->diffInDays(now()) : 0;
+    }
+
+    /**
+     * The realtor who captured this lead.
+     *
+     * A lead arrives through a realtor's questionnaire link or an advert. If it
+     * later becomes an investor, this is who gets the credit.
+     */
+    public function realtor(): BelongsTo
+    {
+        return $this->belongsTo(Agent::class, 'assigned_agent_id');
+    }
+
+    public function convertedUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'converted_user_id');
+    }
+
+    public function incomeLabel(): ?string { return Nigeria::incomeLabel($this->income_bracket); }
+
+    public function occupationLabel(): ?string { return Nigeria::occupationLabel($this->occupation); }
+
+    public function sourceLabel(): ?string { return Nigeria::sourceLabel($this->heard_about_us); }
+
+    /**
+     * "Ikeja, Lagos" — the way anyone here would actually say it.
+     *
+     * NOT named where(): Eloquent forwards unknown static calls to the query
+     * builder, and an instance method by that name shadows Model::where()
+     * for the whole class.
+     */
+    public function placeLabel(): ?string
+    {
+        return $this->lga && $this->state ? $this->lga.", ".$this->state : $this->state;
     }
 
     public function isStale(int $days = 14): bool

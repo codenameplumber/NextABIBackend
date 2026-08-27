@@ -37,25 +37,27 @@
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
                        style="max-width:560px;background:#FFFFFF;border:1px solid #E3DFD7;border-radius:14px;overflow:hidden;">
 
+                    {{--
+                        A dark masthead, and the real logo on it.
+
+                        The wordmark is built for a dark ground — its "ABI" is
+                        a pale silver that disappears on white — so the strip
+                        is black rather than the logo being shrunk to a mark.
+                        It also gives the mail a recognisable top edge in a
+                        crowded inbox, which the old letter-in-a-box did not.
+
+                        Absolute URL via asset(): a mail client has no origin
+                        to resolve a relative path against. ALT text carries
+                        the brand for the many clients that block images by
+                        default, and the width/height are attributes rather
+                        than CSS because Outlook ignores the latter.
+                    --}}
                     <tr>
-                        <td style="padding:26px 32px 0;">
-                            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
-                                <tr>
-                                    <td style="padding-right:10px;vertical-align:middle;">
-                                        <span style="display:inline-block;width:30px;height:30px;background:#171614;border-radius:8px;text-align:center;line-height:30px;">
-                                            <span style="color:#E0A82E;font:700 15px/30px Georgia,serif;">N</span>
-                                        </span>
-                                    </td>
-                                    <td style="vertical-align:middle;">
-                                        <div style="font:600 15px/1.1 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#171614;">
-                                            {{ config('app.name') }}
-                                        </div>
-                                        <div style="font:400 11px/1.4 -apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#8B8578;">
-                                            Adaptive Business Intelligence
-                                        </div>
-                                    </td>
-                                </tr>
-                            </table>
+                        <td style="background:#08080A;padding:22px 32px;" align="left">
+                            <img src="{{ asset('img/logo.png') }}"
+                                 alt="{{ config('app.name') }} — Adaptive Business Intelligence"
+                                 width="148" height="60"
+                                 style="display:block;border:0;outline:none;text-decoration:none;height:auto;width:148px;max-width:148px;">
                         </td>
                     </tr>
 

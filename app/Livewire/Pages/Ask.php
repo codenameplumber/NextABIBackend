@@ -30,6 +30,16 @@ class Ask extends Component
     #[Url(except: '')]
     public string $q = '';
 
+    /**
+     * The finding this question was asked about, when it arrived from a card.
+     *
+     * Only ever applies to the question carried in on the URL. Anything typed
+     * afterwards is a fresh question and goes through the router, which is why
+     * it is cleared the moment it has been used.
+     */
+    #[Url(except: null)]
+    public ?int $from = null;
+
     public string $draft = '';
 
     /** Newest first, so the answer you just asked for is at the top. */
@@ -38,11 +48,11 @@ class Ask extends Component
     public function mount(): void
     {
         if ($this->q !== '') {
-            $this->submit($this->q);
+            $this->submit($this->q, $this->from);
         }
     }
 
-    public function submit(?string $question = null): void
+    public function submit(?string $question = null, ?int $from = null): void
     {
         $question = trim($question ?? $this->draft);
 
@@ -52,9 +62,10 @@ class Ask extends Component
 
         $engine = new AskEngine($this->tenant(), $this->metrics(), $this->engine());
 
-        array_unshift($this->answers, $engine->ask($question));
+        array_unshift($this->answers, $engine->ask($question, $from));
         $this->draft = '';
         $this->q = '';
+        $this->from = null;
     }
 
     public function render()

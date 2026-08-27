@@ -6,6 +6,9 @@ use App\Engine\InsightEngine;
 use App\Mail\AgencyWelcome;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Platform\Registrations;
+use App\Platform\Realtors;
+use App\Support\Nigeria;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -17,20 +20,11 @@ class AuthController extends Controller
 {
     public function showLogin()
     {
-        return view('auth.login', [
-            // The demo accounts are listed on the page itself. A judge or a
-            // reviewer should not have to read a README to get in.
-            'demoAccounts' => User::query()
-                ->whereIn('email', [
-                    'ada@anchorstone.ng',
-                    'tunde@anchorstone.ng',
-                    'ngozi@anchorstone.ng',
-                    'client@example.com',
-                ])
-                ->get()
-                ->sortBy(fn ($u) => $u->is_client ? 1 : 0)
-                ->values(),
-        ]);
+        // The demo accounts used to be listed here as one-click chips. They are
+        // documented in the README instead: a sign-in page that hands out six
+        // working logins reads as a demo rather than as a product, and the
+        // chips were the loudest thing on the screen.
+        return view('auth.login');
     }
 
     public function login(Request $request): RedirectResponse
@@ -38,7 +32,6 @@ class AuthController extends Controller
         $data = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
-            'destination' => ['nullable', 'in:agency,client'],
             'seat' => ['nullable', 'string'],
         ]);
 
@@ -54,11 +47,16 @@ class AuthController extends Controller
         $user = $request->user();
 
         /**
-         * The seat carries into the console.
+         * The seat carries into the console, when something sends one.
          *
-         * It re-ranks the feed; it does not filter it. Stored on the session
-         * rather than the user, because "which lens am I looking through right
-         * now" is a property of the sitting, not of the person.
+         * The sign-in form no longer asks. A lens is a preference, not a
+         * credential, and putting it on the door made signing in look like a
+         * configuration step — so the account's own `role` ranks the feed and
+         * whoever wants a different lens changes it inside the console.
+         *
+         * The handling stays because the session key is still the thing the
+         * role switcher writes, and because a nullable seat arriving from
+         * anywhere else should still be honoured rather than silently dropped.
          */
         if (! $user->isStaff()) {
             $request->session()->forget('nexabi.role');
@@ -67,110 +65,123 @@ class AuthController extends Controller
         }
 
         /**
-         * Where they said they were going.
+         * Where they belong.
          *
-         * If a buyer picks Agency, they still land in the portal — the picker
-         * is a convenience, never an authorisation. Saying so here rather than
-         * letting the middleware bounce them silently means the mismatch is
-         * explained instead of just happening.
+         * The form used to ask people to declare this and then ignored the
+         * answer, which was theatre while there were two kinds of account and
+         * actively misleading once there were three. The account already knows,
+         * so it decides — and a realtor still waiting on approval lands on the
+         * holding screen rather than a dead end.
          */
-        $wanted = $data['destination'] ?? null;
         $home = $this->homeFor($user);
-
-        if ($wanted === 'agency' && ! $user->isStaff()) {
-            return redirect()->route('portal.overview')->with(
-                'status',
-                'That account is a client account, so this is your portal rather than the console.',
-            );
-        }
-
-        if ($wanted === 'client' && $user->isStaff()) {
-            return redirect()->route('app.dashboard')->with(
-                'status',
-                'That account is a staff account, so this is the console rather than a client portal.',
-            );
-        }
 
         return redirect()->intended($home);
     }
 
-    public function showRegister()
+    /* ----------------------------------------------------- registration */
+
+    /**
+     * Investor registration.
+     *
+     * ?ref=CODE arrives from a realtor's link and is shown back to the person
+     * rather than hidden — "Chidi is registering you" is reassurance when it is
+     * right, and a correctable mistake when it is not.
+     */
+    public function showRegister(Request $request)
     {
-        return view('auth.register');
+        return view('auth.register', [
+            'realtor' => app(Realtors::class)->findByCode($request->query('ref')),
+            'ref' => $request->query('ref'),
+            'states' => Nigeria::stateNames(),
+            'lgaMap' => Nigeria::STATES,
+            'incomes' => Nigeria::INCOME_BRACKETS,
+            'occupations' => Nigeria::OCCUPATIONS,
+            'sources' => Nigeria::REFERRAL_SOURCES,
+        ]);
+    }
+
+    public function register(Request $request): RedirectResponse
+    {
+        $data = $request->validate(array_merge([
+            'name' => ['required', 'string', 'max:120'],
+            'email' => ['required', 'email', 'max:190', 'unique:users,email'],
+            'phone' => ['nullable', 'string', 'max:32'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ], Registrations::profileRules()));
+
+        if (! $tenant = Tenant::first()) {
+            return back()->withErrors(['email' => 'The platform is not set up yet.']);
+        }
+
+        $result = app(Registrations::class)->investor($tenant, $data, $request->input('ref'));
+
+        if (! $result['ok']) {
+            return back()
+                ->withInput($request->except('password', 'password_confirmation'))
+                ->withErrors(['lga' => $result['message']]);
+        }
+
+        Auth::login($result['user']);
+        $request->session()->regenerate();
+
+        return redirect()->route('portal.browse')->with('status', $result['message']);
+    }
+
+    /* --------------------------------------------------------- realtors */
+
+    public function showRealtorApply()
+    {
+        return view('auth.realtor-apply');
     }
 
     /**
-     * Registration provisions a whole agency, not just a login.
+     * A realtor signs themselves up, and then waits.
      *
-     * A new tenant with no rows has nothing for the detectors to find, so the
-     * account would open onto fourteen empty cards. Instead the first sign-up
-     * gets a seeded book of business it can explore, and the Settings page
-     * offers CSV import to replace it with the real thing.
+     * Logged in straight away on purpose: the holding screen is worth seeing,
+     * because it says what happens next and roughly when. An application that
+     * ends on a blank page reads as one that went nowhere.
      */
-    public function register(Request $request): RedirectResponse
+    public function realtorApply(Request $request): RedirectResponse
     {
-        /**
-         * A buyer cannot sign themselves up.
-         *
-         * A client account is meaningless without a customer record to attach
-         * it to, and that record only exists because an agency created it when
-         * the person bought something. Saying so is better than accepting the
-         * form and creating an account that can see nothing.
-         */
-        if ($request->input('kind') === 'client') {
-            return back()
-                ->withInput($request->except('password', 'password_confirmation'))
-                ->withErrors([
-                    'email' => 'Buyer accounts are created by your agency. '
-                        .'Ask them to invite you and you will get a sign-in link by email.',
-                ]);
-        }
-
         $data = $request->validate([
-            'agency' => ['required', 'string', 'max:120'],
             'name' => ['required', 'string', 'max:120'],
-            'email' => ['required', 'email', 'unique:users,email'],
+            'email' => ['required', 'email', 'max:190', 'unique:users,email'],
+            'phone' => ['required', 'string', 'max:32'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        $tenant = Tenant::create([
-            'name' => $data['agency'],
-            'slug' => str($data['agency'])->slug().'-'.str()->random(4),
-            'currency' => 'NGN',
-            'settings' => [],
-        ]);
-
-        $user = User::create([
-            'tenant_id' => $tenant->id,
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
-            'role' => 'ceo',
-            'is_client' => false,
-        ]);
-
-        // Queued if a queue is configured, sent inline otherwise. Either way a
-        // mail failure must not cost someone the account they just created.
-        try {
-            Mail::to($user)->send(new AgencyWelcome($user));
-        } catch (\Throwable $e) {
-            report($e);
+        if (! $tenant = Tenant::first()) {
+            return back()->withErrors(['email' => 'The platform is not set up yet.']);
         }
 
-        Auth::login($user);
+        $result = app(Realtors::class)->register($tenant, $data);
+
+        Auth::login($result['user']);
         $request->session()->regenerate();
 
-        return redirect()->route('app.settings')
-            ->with('status', 'Your agency is set up. Import your data, or load the sample book to look around first.');
+        return redirect()->route('realtor.pending')->with('status', $result['message']);
     }
 
+    /**
+     * Sign out, and land on the sign-in page.
+     *
+     * It used to return to the marketing home, which left somebody who had
+     * just pressed "Sign out" looking at a page selling them the product —
+     * with no confirmation anything had happened and no obvious way back in.
+     * Somebody signing out is almost always either finished or switching
+     * accounts, and both of those want this screen.
+     *
+     * The flash is the part that matters: without it the redirect is
+     * indistinguishable from the session having quietly expired.
+     */
     public function logout(Request $request): RedirectResponse
     {
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('home');
+        return redirect()->route('login')
+            ->with('status', 'You have been signed out.');
     }
 
     /**
@@ -191,8 +202,15 @@ class AuthController extends Controller
         return back();
     }
 
+    /**
+     * Where this account belongs.
+     *
+     * Asks the user rather than branching on staff-or-not: there are three
+     * kinds of account now, and a two-way branch silently sends realtors to
+     * the investor portal.
+     */
     private function homeFor(User $user): string
     {
-        return $user->isStaff() ? route('app.dashboard') : route('portal.overview');
+        return route($user->homeRoute());
     }
 }

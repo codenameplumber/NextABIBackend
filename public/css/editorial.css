@@ -406,6 +406,17 @@
 }
 @media (max-width: 940px) { .auth-shell { grid-template-columns: minmax(0, 1fr); } }
 
+/* Single-column form, centred on both axes. Vertical padding rather than a
+   fixed height so a form taller than the viewport scrolls instead of being
+   clipped — which is what happens to the register form on a short laptop. */
+.auth-shell--single {
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  justify-items: center;
+  padding: var(--s-9) var(--s-5);
+  background: var(--bg);
+}
+
 .auth-form-side {
   display: grid; align-content: center; justify-items: stretch;
   padding: var(--s-7) clamp(24px, 5vw, 72px);

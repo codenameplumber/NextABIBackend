@@ -53,9 +53,43 @@ class InsightEngine
 
     public const AREAS = [
         'sales' => 'Sales', 'leads' => 'Leads', 'properties' => 'Properties',
-        'marketing' => 'Marketing', 'customers' => 'Customers',
-        'finance' => 'Finance', 'feedback' => 'Feedback',
+        'marketing' => 'Marketing', 'customers' => 'Investors',
+        'finance' => 'Finance', 'feedback' => 'Satisfaction',
     ];
+
+    /**
+     * Where an area drills to.
+     *
+     * An explicit map rather than 'app.' . $area, because the two stopped
+     * matching when Feedback lost its screen — satisfaction is still measured
+     * and still detected, it is just read on the investor now. A concatenation
+     * turns that into a 500 on the dashboard rather than a link somewhere
+     * sensible.
+     */
+    public const AREA_ROUTES = [
+        // The seven areas.
+        'sales' => 'app.sales',
+        'leads' => 'app.leads',
+        'properties' => 'app.properties',
+        'marketing' => 'app.marketing',
+        'customers' => 'app.customers',
+        'finance' => 'app.finance',
+        // Satisfaction is still detected; it is read on the investor now.
+        'feedback' => 'app.customers',
+
+        // Other destinations evidence can drill to. Listed rather than
+        // concatenated so a missing one is a wrong link, not a 500.
+        'analytics' => 'app.analytics',
+        'activity' => 'app.activity',
+        'insights' => 'app.insights',
+        'commitments' => 'app.commitments',
+        'realtors' => 'app.realtors',
+    ];
+
+    public static function areaRoute(?string $area): string
+    {
+        return self::AREA_ROUTES[$area] ?? 'app.dashboard';
+    }
 
     public const ROLES = [
         'ceo' => ['label' => 'CEO / Managing Director', 'hint' => 'Everything, weighted by revenue impact'],

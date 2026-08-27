@@ -67,10 +67,10 @@ class FeedbackCluster implements Detector
                 ],
                 evidence: [
                     Signal::evidence('Mentions (60d)', $tag['count'], null,
-                        ['route' => 'feedback', 'params' => ['tag' => $tag['key']]]),
+                        ['route' => 'customers', 'params' => ['tag' => $tag['key']]]),
                     Signal::evidence('Prior 60d', $tag['prev']),
                     Signal::evidence('Negative', $tag['negative'], null,
-                        ['route' => 'feedback', 'params' => ['tag' => $tag['key'], 'rating' => 'low']]),
+                        ['route' => 'customers', 'params' => ['tag' => $tag['key'], 'rating' => 'low']]),
                     Signal::evidence('Avg rating on tag', number_format($tag['avgRating'], 1)),
                     Signal::evidence('Overall rating', number_format($fb['avgRating'], 2)),
                 ],

@@ -22,9 +22,21 @@ class AreaInsights extends Component
     #[Locked]
     public string $area;
 
-    public int $limit = 2;
+    /**
+     * One card. Not two, and never "however many were found".
+     *
+     * A module screen exists to show its own table; the finding above it is
+     * there to tell you what to look at first. Two findings is already a
+     * ranking exercise the reader did not ask to do, and the ranking has
+     * already been done — priority is severity × confidence × role weight ×
+     * impact, so the top one IS the answer to "what matters here".
+     *
+     * The rest are not hidden: the header says how many there are and links
+     * to all of them.
+     */
+    public int $limit = 1;
 
-    public function mount(string $area, int $limit = 2): void
+    public function mount(string $area, int $limit = 1): void
     {
         $this->area = $area;
         $this->limit = $limit;

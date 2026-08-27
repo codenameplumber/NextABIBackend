@@ -23,11 +23,15 @@
         </div>
     </section>
 
+    {{-- Two lines, not four. The original explained the page's own layout back
+         to the reader, which is the sort of copy that fills a gap rather than
+         doing a job — and it was the densest block on a screen about
+         somebody's money. --}}
     <div class="page-note pt-note">
         <x-icon name="info" size="15" />
         <span>
-            Everything about the property you bought, in one place. The panel above is the one thing
-            that needs you right now — the rest is here whenever you want it.
+            Your property, your schedule and your documents — all below. Anything that needs you
+            is in the panel above.
         </span>
     </div>
 

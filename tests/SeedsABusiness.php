@@ -2,13 +2,10 @@
 
 namespace Tests;
 
-use App\Models\Customer;
 use App\Models\Tenant;
 use App\Models\User;
-use App\Support\BusinessSimulator;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 
 /**
  * Seeds one full agency, once, for the whole suite.
@@ -28,40 +25,10 @@ trait SeedsABusiness
     protected function setUpBusiness(): void
     {
         if (! self::$seeded) {
-            Artisan::call('migrate:fresh', ['--force' => true]);
-
-            $tenant = Tenant::create([
-                'name' => 'Anchorstone Properties',
-                'slug' => 'anchorstone',
-                'city' => 'Lagos',
-                'currency' => 'NGN',
-                'settings' => ['policies' => []],
-            ]);
-
-            app()->instance('nexabi.tenant', $tenant);
-            (new BusinessSimulator($tenant))->run();
-
-            foreach ([
-                ['Ada Okonkwo', 'ada@anchorstone.ng', 'ceo'],
-                ['Ngozi Eze', 'ngozi@anchorstone.ng', 'finance'],
-            ] as [$name, $email, $role]) {
-                User::create([
-                    'tenant_id' => $tenant->id, 'name' => $name, 'email' => $email,
-                    'role' => $role, 'password' => Hash::make('password'),
-                    'is_client' => false, 'email_verified_at' => now(),
-                ]);
-            }
-
-            $customer = Customer::query()
-                ->withCount(['payments as unpaid' => fn ($q) => $q->whereNull('paid_at')])
-                ->having('unpaid', '>', 0)->orderByDesc('ltv')->first();
-
-            User::create([
-                'tenant_id' => $tenant->id, 'name' => $customer->name,
-                'email' => 'client@example.com', 'role' => 'agent',
-                'customer_id' => $customer->id, 'is_client' => true,
-                'password' => Hash::make('password'), 'email_verified_at' => now(),
-            ]);
+            // The real seeder, not a copy of it. A fixture that builds its own
+            // accounts is a fixture that can pass while the shipped dataset is
+            // broken — which is the one thing a test suite must not do.
+            Artisan::call('migrate:fresh', ['--seed' => true, '--force' => true]);
 
             self::$seeded = true;
         }

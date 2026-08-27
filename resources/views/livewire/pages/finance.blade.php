@@ -44,6 +44,16 @@
         <x-kpi label="Due next 30 days" :value="$f['expected30']" format="money" ico="clock" />
     </div>
 
+    {{-- The three figures this screen is asked for first. --}}
+    <div class="grid g-3">
+        <x-kpi label="Assets sold" :value="$assetsSoldValue" format="money" ico="property"
+               :note="Fmt::num($assetsSold).' commitments approved'" />
+        <x-kpi label="Commission paid" :value="$commissionPaid" format="money" ico="check"
+               note="Settled with realtors" />
+        <x-kpi label="Commission owed" :value="$commissionOwed" format="money" ico="agent" invert
+               :note="$commissionOwed > 0 ? 'Awaiting payout' : 'All settled'" />
+    </div>
+
     <livewire:area-insights area="finance" />
 
     {{-- ----------------------------------------------------- aging view -- --}}
@@ -172,7 +182,7 @@
                 <thead>
                     <tr>
                         <th>Customer</th><th class="right">Amount</th><th>Status</th>
-                        <th class="right">Due</th><th class="right">Paid</th><th>Method</th>
+                        <th class="right">Due</th><th class="right">Paid</th><th>Record</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -193,7 +203,31 @@
                             <td class="right">
                                 <span class="num t-3">{{ $r->paid_at ? Fmt::date($r->paid_at) : '—' }}</span>
                             </td>
-                            <td><span class="t-3 t-sm">{{ $r->method }}</span></td>
+                            {{-- Money arrives as a bank transfer and somebody keys
+                                 it in. The reference is required, because a disputed
+                                 payment without one is a conversation nobody wins. --}}
+                            <td>
+                                @if ($live === 'paid')
+                                    <div class="row-2" style="gap:var(--s-2)">
+                                        <span class="t-3 t-xs mono">{{ $r->reference ?? $r->method }}</span>
+                                        <button class="btn btn--ghost btn--sm"
+                                                wire:click="reversePayment({{ $r->id }})"
+                                                wire:confirm="Reverse this recording?">
+                                            <span>Undo</span>
+                                        </button>
+                                    </div>
+                                @else
+                                    <div class="row-2" style="gap:var(--s-2)">
+                                        <input class="input" style="min-width:120px;max-width:150px"
+                                               placeholder="Transfer ref"
+                                               wire:model="reference.{{ $r->id }}">
+                                        <button class="btn btn--sm"
+                                                wire:click="recordPayment({{ $r->id }})">
+                                            <span>Record</span>
+                                        </button>
+                                    </div>
+                                @endif
+                            </td>
                         </tr>
                     @empty
                         <tr>
@@ -211,4 +245,56 @@
             <div class="card__foot">{{ $rows->links() }}</div>
         @endif
     </section>
+
+    {{-- ─────────────────────────────────────────── commission payouts ──
+         Owed first: an unpaid obligation is the thing that needs a decision,
+         and a settled one is a record.                                    --}}
+
+    @if ($payouts->isNotEmpty())
+        <x-card title="Commission" :sub="Fmt::money($commissionOwed).' owed across '.$payouts->where('status', 'owed')->count().' sales'">
+            <div class="tablewrap">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Realtor</th><th>Property</th><th class="right">Sale value</th>
+                            <th class="right">Rate</th><th class="right">Commission</th>
+                            <th>Status</th><th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($payouts as $po)
+                            <tr wire:key="po-{{ $po->id }}">
+                                <td>
+                                    <div class="cell-primary">{{ $po->realtor?->name ?? '—' }}</div>
+                                    <div class="t-xs t-3 mono">{{ $po->realtor?->code }}</div>
+                                </td>
+                                <td>
+                                    <div class="t-sm">{{ $po->commitment?->property?->title ?? '—' }}</div>
+                                    <div class="t-xs t-3">{{ $po->commitment?->property?->ref }}</div>
+                                </td>
+                                <td class="right">{{ Fmt::money($po->commitment?->value ?? 0) }}</td>
+                                <td class="right">{{ number_format($po->rate * 100, 1) }}%</td>
+                                <td class="right semi">{{ Fmt::money($po->amount) }}</td>
+                                <td>
+                                    <x-badge :kind="$po->statusKind()">{{ $po->statusLabel() }}</x-badge>
+                                </td>
+                                <td class="right">
+                                    @if ($po->isWrittenOff())
+                                        <span class="t-xs t-3">Sale cancelled</span>
+                                    @elseif ($po->isPaid())
+                                        <span class="t-xs t-3">{{ Fmt::dateShort($po->paid_at) }}</span>
+                                    @else
+                                        <button class="btn btn--sm" wire:click="payCommission({{ $po->id }})"
+                                                wire:confirm="Mark {{ Fmt::money($po->amount) }} as paid to {{ $po->realtor?->name }}?">
+                                            <span>Mark paid</span>
+                                        </button>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </x-card>
+    @endif
 </div>

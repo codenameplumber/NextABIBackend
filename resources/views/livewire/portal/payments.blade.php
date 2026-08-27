@@ -141,6 +141,84 @@
         </div>
     @endif
 
+    {{-- ───────────────────────────────────────── everything else held ──
+         Browsing encourages a second purchase, so a page that shows one and
+         hides the rest would be quietly wrong for anyone who took it up. --}}
+
+    @if ($awaiting->isNotEmpty() || $others->isNotEmpty())
+        <div>
+            <div class="pt-sec">
+                <div>
+                    <h2>My other properties</h2>
+                    <p>
+                        {{ $others->count() + $awaiting->count() }}
+                        {{ ($others->count() + $awaiting->count()) === 1 ? 'more commitment' : 'more commitments' }}
+                    </p>
+                </div>
+            </div>
+
+            <div class="pgrid">
+                @foreach ($awaiting as $c)
+                    <div class="pcard">
+                        <div class="pcard__art">
+                            <x-property-art :property="$c->property" />
+                            <span class="pcard__tag">Awaiting approval</span>
+                        </div>
+                        <div class="pcard__b">
+                            <h3 class="pcard__t">{{ $c->property?->title ?? 'Property' }}</h3>
+                            <span class="pcard__loc">{{ $c->property?->location }}</span>
+                            <span class="pcard__price">{{ Fmt::money($c->value) }}</span>
+                            <span class="pcard__per">
+                                {{ $c->duration_months }} months · committed {{ Fmt::ago($c->committed_at) }}.
+                                Nothing starts until this is approved.
+                            </span>
+                        </div>
+                    </div>
+                @endforeach
+
+                @foreach ($others as $o)
+                    @php $prog = $o->progress(); @endphp
+                    <div class="pcard">
+                        <div class="pcard__art">
+                            <x-property-art :property="$o->property" />
+                            @if ($o->settled())
+                                <span class="pcard__tag">Fully paid</span>
+                            @endif
+                        </div>
+                        <div class="pcard__b">
+                            <h3 class="pcard__t">{{ $o->property?->title ?? 'Property' }}</h3>
+                            <span class="pcard__loc">{{ $o->property?->location }}</span>
+                            <span class="pcard__price">{{ Fmt::money($o->total()) }}</span>
+
+                            <div style="margin-top:var(--s-2)">
+                                <div class="row-2" style="justify-content:space-between;margin-bottom:5px">
+                                    <span class="t-xs t-3">
+                                        {{ $o->paid()->count() }} of {{ $o->payments->count() }} paid
+                                    </span>
+                                    <span class="t-xs semi">{{ Fmt::pct($prog, 0) }}</span>
+                                </div>
+                                <div class="jbar">
+                                    <div class="jbar__f" style="width:{{ round($prog * 100, 1) }}%"></div>
+                                </div>
+                            </div>
+
+                            @if ($o->lateCount())
+                                <span class="pcard__per" style="color:var(--neg)">
+                                    {{ Fmt::money($o->lateAmount()) }} past due on this one
+                                </span>
+                            @elseif ($o->next())
+                                <span class="pcard__per">
+                                    Next <b>{{ Fmt::money($o->next()->amount) }}</b>
+                                    on {{ Fmt::dateShort($o->next()->due_at) }}
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     {{-- ─────────────────────────────────────────────────── schedule ── --}}
 
     <div>

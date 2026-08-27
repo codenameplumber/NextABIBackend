@@ -13,6 +13,19 @@
   z-index: var(--z-nav);
 }
 
+/* The three rows above belong to the brandmark, the nav and the foot — but the
+   sidebar's only real child is Livewire's component root, so the grid was
+   laying out ONE item and the row sizing never reached anything. The nav then
+   had no bounded height, its overflow-y never engaged, and the menu simply ran
+   off the bottom of the screen with no way to reach the last items.
+
+   display:contents takes the wrapper out of the box tree while leaving it in
+   the DOM, so Livewire still finds its root to morph and the grid sees the
+   three children it was written for. */
+.sidebar > [wire\:id],
+.sidebar > [data-wire-id],
+.sidebar > div:only-child { display: contents; }
+
 .brandmark {
   display: flex; align-items: center; gap: var(--s-3);
   padding: 0 var(--s-4);
@@ -29,7 +42,16 @@
   text-transform: uppercase; color: var(--text-3); white-space: nowrap;
 }
 
-.nav { overflow-y: auto; padding: var(--s-4) var(--s-3) var(--s-3); display: grid; gap: var(--s-1); align-content: start; }
+/* min-height:0 is what actually makes the scrolling work. A `1fr` grid row
+   floors at min-content by default, so the track grows to fit every item and
+   overflow-y never has anything to overflow. */
+.nav {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+  padding: var(--s-4) var(--s-3) var(--s-3);
+  display: grid; gap: var(--s-1); align-content: start;
+}
 .nav__label {
   font-size: var(--t-xs); font-weight: 600; letter-spacing: .13em; text-transform: uppercase;
   color: var(--text-4); padding: var(--s-4) var(--s-3) var(--s-2);
@@ -305,48 +327,11 @@
 }
 .meter > i { display: block; height: 100%; border-radius: var(--r-full); background: var(--c1); }
 
-/* ===========================  INSIGHT CARD  ==============================
-   The gold moment. This is the only component that leans on brand colour,
-   because this is where the intelligence layer speaks.
+/* The old .insight card lived here. It was replaced by .finding, which asks
+   three questions in a fixed order instead of stacking a title, a paragraph
+   and a row of buttons. The .evidence chips below survived the rewrite intact
+   — they were always the best part of it.
    ========================================================================= */
-
-.insight {
-  position: relative;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  overflow: hidden;
-  transition: border-color var(--base), box-shadow var(--base), opacity var(--base), transform var(--base);
-}
-/* Severity is carried by the badge — which has a dot AND a word, so it never
-   depends on colour alone. A coloured spine as well was decoration doing a job
-   already done. */
-
-.insight:hover { border-color: var(--border-2); box-shadow: var(--sh-2); }
-.insight.is-resolved { opacity: .5; }
-.insight.is-leaving { opacity: 0; transform: translateX(16px) scale(.98); }
-
-.insight__head {
-  display: flex; align-items: flex-start; gap: var(--s-3);
-  padding: var(--s-4) var(--s-5) var(--s-3);
-}
-.insight__glyph {
-  flex: none; width: 30px; height: 30px; border-radius: var(--r-md);
-  display: grid; place-items: center;
-  background: var(--brand-glow); color: var(--brand-500);
-}
-.insight__glyph svg { width: 16px; height: 16px; }
-
-.insight__title {
-  font-size: var(--t-md); font-weight: 600; letter-spacing: -.012em; line-height: 1.32;
-}
-.insight__meta { display: flex; align-items: center; gap: var(--s-2); margin-top: 5px; flex-wrap: wrap; }
-
-.insight__body { padding: 0 var(--s-5) var(--s-4); }
-.insight__narrative {
-  font-size: var(--t-base); line-height: 1.62; color: var(--text-2);
-}
-.insight__narrative b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* Evidence — the credibility mechanism. Every number links to its rows. */
 .evidence {
@@ -366,22 +351,6 @@
 .evidence__item[data-drill]:hover { border-color: var(--brand-edge); background: var(--brand-glow); }
 .evidence__k { color: var(--text-3); }
 .evidence__v { font-weight: 650; font-variant-numeric: tabular-nums; }
-
-/* Recommendation strip */
-.recs { border-top: 1px solid var(--border); background: var(--surface-2); }
-.rec {
-  display: flex; align-items: center; gap: var(--s-3);
-  padding: var(--s-3) var(--s-5);
-  border-bottom: 1px solid var(--border);
-}
-.rec:last-child { border-bottom: none; }
-.rec__text { min-width: 0; }
-.rec__label { font-size: var(--t-base); font-weight: 550; }
-.rec__why { font-size: var(--t-sm); color: var(--text-3); margin-top: 2px; }
-.rec__actions { margin-left: auto; display: flex; gap: var(--s-2); flex: none; }
-
-.rec.is-done { opacity: .55; }
-.rec.is-done .rec__label { text-decoration: line-through; text-decoration-color: var(--text-4); }
 
 /* AI narration shimmer while the provider "thinks" */
 .narrating {
@@ -627,3 +596,1146 @@ select.input { cursor: pointer; padding-right: var(--s-5); appearance: auto; }
 }
 .page-note svg { flex: none; margin-top: 2px; color: var(--brand-500); opacity: .85; }
 .page-note b { color: var(--text); font-weight: 600; }
+
+/* ===========================================================================
+   Property artwork
+   ---------------------------------------------------------------------------
+   Lives here rather than in portal.css because a property card appears on the
+   public catalogue, in the investor portal, in the realtor area AND in the
+   console — and components.css is the one stylesheet every layout loads.
+
+   That was the bug behind the caption overlapping the picture on the homepage:
+   the badges are absolutely positioned, the rules that positioned them were in
+   a file the public layout never loaded, so they fell back into normal flow
+   and pushed into the title underneath.
+   =========================================================================== */
+
+.prop-art {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--art-sky-4);
+  min-height: 190px;
+}
+
+.prop-art__photo,
+.prop-art__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  object-fit: cover;
+  /* A photograph and a drawing should sit at the same weight in a grid. */
+  background: var(--art-sky-4);
+}
+
+/* A scrim under the chips only — a full overlay would flatten the picture.
+   Without it a white caption lands on a bright sky and a dark one lands on a
+   shadow, and neither is legible. */
+.prop-art__scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to bottom, rgba(0,0,0,.34) 0, rgba(0,0,0,0) 82px),
+    linear-gradient(to top,    rgba(0,0,0,.38) 0, rgba(0,0,0,0) 88px);
+}
+
+.prop-art__ref,
+.prop-art__type {
+  position: absolute;
+  z-index: 1;
+  font-size: var(--t-xs);
+  line-height: 1;
+  padding: 5px 9px;
+  border-radius: var(--r-full);
+  white-space: nowrap;
+  /* Fixed light-on-dark against the scrim rather than theme tokens: the chip
+     sits on a photograph, not on a surface, so it must not follow the page. */
+  color: #fff;
+  background: rgba(12, 12, 14, .52);
+  border: 1px solid rgba(255, 255, 255, .18);
+  backdrop-filter: blur(6px);
+}
+
+.prop-art__ref {
+  left: var(--s-3);
+  top: var(--s-3);
+  font-family: var(--mono);
+  letter-spacing: .04em;
+}
+
+.prop-art__type {
+  right: var(--s-3);
+  bottom: var(--s-3);
+  font-weight: 500;
+}
+
+/* Inside a card the frame already sets the aspect ratio, so the artwork fills
+   it absolutely rather than carrying a min-height that can exceed the box on a
+   narrow column — which is what made it spill over the title. */
+.pcard__art .prop-art,
+.prop-card .prop-art {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+}
+
+.pcard__art .prop-art__photo,
+.pcard__art .prop-art__svg,
+.prop-card .prop-art__photo,
+.prop-card .prop-art__svg { min-height: 0; }
+
+/* The portal's property panel is a two-column card, not an aspect-ratio box. */
+.prop-card .prop-art { position: relative; min-height: 210px; }
+
+@media (max-width: 720px) {
+  .prop-card .prop-art { min-height: 180px; }
+}
+
+/* ===========================================================================
+   Pagination
+   ---------------------------------------------------------------------------
+   Built from tokens so it follows the theme, unlike the Tailwind markup
+   Laravel ships — which this codebase has nothing to style.
+   =========================================================================== */
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  flex-wrap: wrap;
+  padding: var(--s-4) 0 var(--s-2);
+  border-top: 1px solid var(--border);
+  margin-top: var(--s-4);
+}
+
+.pager__count {
+  font-size: var(--t-sm);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.pager__count b { color: var(--text-2); font-weight: 600; }
+
+.pager__nav { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+
+.pager__pages { display: flex; align-items: center; gap: 4px; }
+
+/* One shared shape for every control in the bar, so a number and a Next button
+   sit on the same baseline at the same height. */
+.pager__btn,
+.pager__page {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  min-width: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: var(--t-sm);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--fast) var(--ease),
+              border-color var(--fast) var(--ease),
+              color var(--fast) var(--ease);
+}
+
+.pager__page { padding: 0 6px; }
+
+.pager__btn:hover,
+.pager__page:hover {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.pager__btn:focus-visible,
+.pager__page:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+/* The page you are on is a state, not a button — so it stops behaving like one. */
+.pager__page.is-on {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
+  cursor: default;
+}
+
+.pager__page.is-on:hover { background: var(--text); color: var(--bg); }
+
+/* Disabled ends stay in place rather than disappearing, so the bar does not
+   jump sideways when you reach the first or last page. */
+.pager__btn.is-off {
+  opacity: .42;
+  cursor: not-allowed;
+  background: transparent;
+}
+
+.pager__btn.is-off:hover {
+  background: transparent;
+  border-color: var(--border-2);
+  color: var(--text-2);
+}
+
+.pager__gap { color: var(--text-4); padding: 0 2px; font-size: var(--t-sm); }
+
+@media (max-width: 620px) {
+  .pager { justify-content: center; }
+  .pager__count { width: 100%; text-align: center; }
+  /* Numbers are the first thing to go on a narrow screen — Previous and Next
+     are what people actually press. */
+  .pager__pages { display: none; }
+}
+
+/* ===========================  THE FINDING CARD  ===========================
+   Replaces .insight on every surface. Three questions in a fixed order —
+   what is happening, what it means, what to do — because that is the order
+   somebody actually asks them, and because a card that answers only the first
+   is a notification rather than an insight.
+
+   The action is a sentence, not a button, everywhere except the Insights
+   screen. That is a deliberate reversal: a finding sitting above a table is
+   context for the table, and being handed something to execute mid-scroll is
+   what turned the previous cards into things people scrolled past.
+   ========================================================================= */
+
+.finding {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--s-5);
+  display: grid;
+  gap: var(--s-3);
+  transition: border-color var(--base) var(--ease), box-shadow var(--base) var(--ease),
+              opacity var(--base) var(--ease), transform var(--base) var(--ease);
+}
+
+.finding:hover { border-color: var(--border-2); box-shadow: var(--sh-2); }
+
+/* Severity is carried by the badge, which has a dot AND a word, so it never
+   depends on colour alone. Critical alone earns an edge as well — at that band
+   the card has to be findable in a scroll without being read first. */
+.finding[data-sev="critical"] { border-color: var(--brand-edge); }
+
+.finding__head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+.finding__glyph {
+  display: grid;
+  place-items: center;
+  width: 26px; height: 26px;
+  border-radius: var(--r-sm, 6px);
+  background: var(--brand-glow);
+  color: var(--brand-600, var(--brand-500));
+  flex: none;
+}
+
+.finding__area {
+  font-size: var(--t-xs);
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+/* ------------------------------------------------------- what is happening */
+
+.finding__what {
+  font-size: var(--t-lg);
+  font-weight: 600;
+  letter-spacing: -.012em;
+  line-height: 1.35;
+  margin: 0;
+  text-wrap: balance;
+}
+
+/* ------------------------------------------------------------ what it means */
+
+.finding__why {
+  font-size: var(--t-md);
+  line-height: 1.62;
+  color: var(--text-2);
+  margin: 0;
+}
+
+/* Figures the narrator bolded. Tabular so a column of them lines up. */
+.finding__why b {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------------------------------------------------------------- what to do */
+
+.finding__do {
+  border-left: 2px solid var(--brand-500);
+  padding: 2px 0 2px var(--s-4);
+}
+
+.finding__do-k {
+  display: block;
+  font-size: var(--t-xs);
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--brand-600, var(--brand-500));
+  margin-bottom: 4px;
+}
+
+.finding__do-v {
+  font-size: var(--t-md);
+  line-height: 1.55;
+  color: var(--text-2);
+  margin: 0;
+}
+
+.finding__do-v b { color: var(--text); font-weight: 600; }
+
+/* ------------------------------------------------------------------- foot */
+
+.finding__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--border);
+}
+
+/* The handler's own before-and-after measurement. Shown only after an action
+   actually ran, because that is the only time it means anything. */
+.finding__result {
+  font-size: var(--t-sm);
+  color: var(--text-3);
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+  padding: var(--s-2) var(--s-3);
+}
+
+@media (max-width: 640px) {
+  .finding { padding: var(--s-4); }
+  .finding__foot .t-xs { display: none; }   /* the byline is the first thing to go */
+}
+
+/* ===========================  RECORD FORMS  ==============================
+   The inline "add a thing" form that sits at the top of a table — marketing
+   records, properties, materials. Inline rather than a modal on purpose: what
+   you are adding belongs to the list underneath it, and a dialog that hides
+   the list makes it harder to see whether you are duplicating a row.
+   ========================================================================= */
+
+.recform {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  padding: var(--s-5);
+}
+
+.recform__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: var(--s-4);
+}
+
+/* Full-bleed rows — a name or a note wants the whole width, not a column. */
+.recform__grid .fgrid--full { grid-column: 1 / -1; }
+
+.recform__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  margin-top: var(--s-5);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--border);
+}
+
+.recform textarea {
+  padding: var(--s-3) var(--s-4);
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-md);
+  font: inherit;
+  font-size: var(--t-md);
+  color: var(--text);
+  resize: vertical;
+  min-height: 62px;
+}
+
+.recform textarea:focus-visible {
+  border-color: var(--brand-500);
+  box-shadow: 0 0 0 3px var(--brand-glow);
+  outline: none;
+}
+
+/* The outcome row, opened under the record it belongs to. Tinted so it reads
+   as attached to the row above rather than as another record. */
+.countrow {
+  background: var(--surface-2);
+  padding: var(--s-4) var(--s-5);
+}
+
+.countrow .field { margin-bottom: 0; }
+
+.nowrap { white-space: nowrap; }
+
+@media (max-width: 700px) {
+  .recform { padding: var(--s-4); }
+  .recform__grid { grid-template-columns: 1fr; }
+}
+
+/* ===========================  CLICKABLE ROWS  ============================
+   A queue row that opens a side canvas. The whole row is the target rather
+   than a trailing "view" link — the operator is scanning down a column and
+   deciding, and making them land on a 60px link at the end of each row turns
+   a decision into an aiming exercise.
+   ========================================================================= */
+
+.table--rows tbody tr.rowlink {
+  cursor: pointer;
+  transition: background var(--fast) var(--ease);
+}
+
+.table--rows tbody tr.rowlink:hover { background: var(--hover); }
+
+.table--rows tbody tr.rowlink:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: -2px;
+}
+
+/* Which row the open canvas belongs to. Without this the panel is detached
+   from the list and closing it leaves you unsure where you were. */
+.table--rows tbody tr.rowlink.is-open {
+  background: var(--brand-glow);
+  box-shadow: inset 2px 0 0 var(--brand-500);
+}
+
+/* ------------------------------------------------------- progress, inline */
+
+.jbar--thin { height: 4px; }
+
+/* ==========================  DEFINITION LIST  ============================
+   Label above value, two columns. Used in the side canvas, where the reader
+   is checking specific fields rather than reading prose, so the label has to
+   be findable without being loud.
+   ========================================================================= */
+
+.dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: var(--s-4);
+  padding: var(--s-4) 0;
+  border-block: 1px solid var(--border);
+}
+
+.dl__k {
+  display: block;
+  font-size: var(--t-xs);
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--text-4);
+  margin-bottom: 3px;
+}
+
+.dl__v {
+  display: block;
+  font-size: var(--t-md);
+  font-weight: 550;
+  line-height: 1.4;
+}
+
+/* ============================  SEARCH PICKER  ============================
+   Choosing one of a hundred-odd people.
+
+   A <select> was the wrong control the moment the book passed about twenty:
+   the name you want sits somewhere in a scroll list with no way to jump to
+   it, and the referral CODE — which is the thing an operator actually has
+   written on a form in front of them — is not searchable at all.
+   ========================================================================= */
+
+.picker {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--s-4);
+}
+
+.picker__list {
+  display: grid;
+  gap: 2px;
+  margin-top: var(--s-3);
+  max-height: 216px;
+  overflow-y: auto;
+}
+
+.picker__opt {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 7px var(--s-3);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font-size: var(--t-md);
+  transition: background var(--fast) var(--ease);
+}
+
+.picker__opt:hover { background: var(--hover); }
+
+/* :has so the whole row highlights on selection, not just the radio. */
+.picker__opt:has(input:checked) {
+  background: var(--brand-glow);
+  color: var(--brand-600, var(--brand-500));
+  font-weight: 550;
+}
+
+.picker__opt input { accent-color: var(--brand-500); flex: none; }
+
+/* ===========================  IMAGE PICKER  ==============================
+   Photographs on a listing, or the asset on a promotional material.
+
+   Two ways in on purpose: a file from the machine, or a link to photography
+   the agency already hosts. Neither is the "real" one — an agency with 700
+   units already shot and on a CDN should not have to re-upload them to use
+   this product, and somebody with a photo on their phone should not have to
+   find hosting first. Both land in the same column.
+   ========================================================================= */
+
+.imgpick {
+  margin-top: var(--s-5);
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--border);
+}
+
+.imgpick__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  margin: var(--s-3) 0;
+  min-height: 24px;
+}
+
+.imgpick__it {
+  position: relative;
+  width: 116px;
+  margin: 0;
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+/* Not yet written to disk. Marked so it is obvious that cancelling loses it. */
+.imgpick__it.is-new { border-color: var(--brand-edge); }
+
+.imgpick__it img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+}
+
+.imgpick__it figcaption {
+  font-size: var(--t-xs);
+  color: var(--text-3);
+  padding: 4px 6px;
+  text-align: center;
+  border-top: 1px solid var(--border);
+}
+
+.imgpick__x {
+  position: absolute;
+  top: 5px; right: 5px;
+  width: 22px; height: 22px;
+  display: grid; place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(4px);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+
+.imgpick__x:hover { background: var(--neg); color: #fff; }
+
+.imgpick__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+}
+
+/* The file input is hidden inside its own label, so the label has to look and
+   behave like the button it is standing in for. */
+.imgpick__controls label.btn { cursor: pointer; }
+
+@media (max-width: 640px) {
+  .imgpick__it { width: 96px; }
+  .imgpick__controls .input { min-width: 0; flex: 1 1 100%; }
+}
+
+/* ==========================  MATERIAL CARDS  ============================
+   Promotional assets, shown as what they look like.
+
+   These were a table of titles, which is unusable for the only decision the
+   screen exists to support: which flyer to send. That is a visual judgement,
+   and a list of filenames makes it one nobody can make without opening every
+   row in turn.
+   ========================================================================= */
+
+.matgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+  gap: var(--s-4);
+}
+
+.matcard {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  transition: border-color var(--base) var(--ease), box-shadow var(--base) var(--ease);
+}
+
+.matcard:hover { border-color: var(--border-2); box-shadow: var(--sh-2); }
+
+/* Withdrawn. Dimmed rather than hidden — it still exists and can come back,
+   and a card that vanishes reads as deleted. */
+.matcard.is-off { opacity: .58; }
+.matcard.is-off .matcard__art { filter: grayscale(1); }
+
+.matcard__art {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.matcard__art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* PDFs, clips and plain messages have no inline preview. Saying what the
+   thing is beats showing a broken image icon. */
+.matcard__doc,
+.imgpick__doc {
+  width: 100%; height: 100%;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 6px;
+  color: var(--text-3);
+  font-size: var(--t-xs);
+  font-weight: 600;
+  letter-spacing: .08em;
+}
+
+.imgpick__doc { aspect-ratio: 4 / 3; }
+
+.matcard__kind {
+  position: absolute;
+  top: var(--s-3); left: var(--s-3);
+  padding: 3px 9px;
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--border-2);
+  font-size: var(--t-xs);
+  font-weight: 550;
+}
+
+.matcard__b { padding: var(--s-4); display: grid; gap: 5px; flex: 1; }
+
+.matcard__t {
+  font-size: var(--t-md);
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.matcard__body {
+  font-size: var(--t-sm);
+  color: var(--text-3);
+  line-height: 1.5;
+  margin: 4px 0 0;
+}
+
+.matcard__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+/* ================================  LOGO  ================================
+   One <img>, two files: the full lockup and the mark alone.
+
+   The wordmark is drawn for a dark ground — its "ABI" is a pale silver that
+   reads beautifully on black and all but disappears on white — so the full
+   lockup goes on dark surfaces only, and the mark carries the brand in the
+   light chrome beside the themed text. That is a property of the artwork, not
+   a preference, and it is why these are two files rather than one.
+   ========================================================================= */
+
+.logo { display: block; flex: none; }
+
+/* The mark sits beside .brand-text, which supplies its own baseline. */
+.logo--mark { object-fit: contain; }
+
+/* The old .brand-mark was an orange chip behind a dark glyph. The mark is
+   itself orange, so any surviving chip has to stop painting a background or
+   the two cancel out. */
+.brand .brand-mark { background: none; width: auto; height: auto; }
+
+/* The collapsed console rail hides the wordmark and keeps the mark. */
+.is-collapsed .brandmark__logo { margin-inline: auto; }
+
+/* ======================  DENSITY AND BREATHING ROOM  =====================
+   A pass over the console's spacing.
+
+   The grid utilities were FIXED column counts — .g-4 was four columns at every
+   width, forever. With a 260px sidebar taking its share, four KPI tiles on a
+   1280px laptop get about 230px each, and a 34px tabular figure with a label
+   above it and a delta plus a note below it does not fit in 230px. The tiles
+   were not badly designed; they were being asked to be half their intended
+   width and everything inside them collided.
+
+   Collapsing the count instead of shrinking the tile is the fix: two roomy
+   tiles read better than four cramped ones, and the reader loses nothing but
+   a row of scrolling.
+   ========================================================================= */
+
+.grid { gap: var(--s-5); }
+
+@media (max-width: 1360px) {
+  .g-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 1180px) {
+  .g-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 900px) {
+  .g-2, .g-3, .g-4 { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ------------------------------------------------------------- KPI tiles */
+
+.kpi {
+  padding: var(--s-5);
+  gap: var(--s-3);
+}
+
+/* The value had no room under it. A 34px figure needs its own line height and
+   a gap below, or the delta beneath it sits on the descenders. */
+.kpi__value { line-height: 1.1; }
+
+/* Delta, comparison and note were on one non-wrapping row. On a narrow tile
+   the note simply ran out of the card. */
+.kpi__foot {
+  flex-wrap: wrap;
+  row-gap: 6px;
+  column-gap: var(--s-3);
+  line-height: 1.35;
+}
+
+/* The sparkline is absolutely positioned across the bottom of the tile, so on
+   a tile carrying a foot as well the two were overlapping. Reserving the
+   height keeps the text clear of the graphic. */
+.kpi:has(.kpi__spark) { padding-bottom: var(--s-8); }
+
+/* ------------------------------------------------------ cards and tables */
+
+.card__body { padding: var(--s-5) var(--s-5) var(--s-6); }
+
+.card__head {
+  padding: var(--s-4) var(--s-5);
+  gap: var(--s-4);
+  flex-wrap: wrap;
+}
+
+.card__title { line-height: 1.3; }
+.card__sub { line-height: 1.45; margin-top: 3px; }
+
+/* Table cells were vertically tight for two-line cells — a primary line plus
+   a muted second line is the standard row in this product, not the exception. */
+.table th, .table td { padding-block: var(--s-3); }
+.table td { line-height: 1.45; }
+.cell-primary { line-height: 1.35; }
+
+/* --------------------------------------------------- the decision header */
+
+/* Count, critical badge, money badge and the button were on one rigid row. */
+.decide__top { flex-wrap: wrap; row-gap: var(--s-2); }
+.decide__title { line-height: 1.3; }
+.decide__why { line-height: 1.55; margin-top: 6px; }
+
+/* ------------------------------------------------------------- the brief */
+
+.hero__text { line-height: 1.62; }
+
+/* ------------------------------------------------------------ page heads */
+
+.page-head { gap: var(--s-4); flex-wrap: wrap; }
+.page-head h1 { line-height: 1.2; }
+
+/* Badges and pills sitting in a row inside prose need to wrap with the prose
+   rather than pushing it sideways. */
+.row-2 { flex-wrap: wrap; }
+
+/* ===============================  PASSWORD REVEAL  ======================
+   The button sits inside the field rather than beside it, so the field keeps
+   its full width and the control cannot be mistaken for a form action.
+   ========================================================================= */
+
+.pw { position: relative; display: block; }
+
+/* Room for the button, so a long password does not run underneath it. */
+.pw input { width: 100%; padding-right: 42px; }
+
+.pw__eye {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm, 6px);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+
+.pw__eye:hover { color: var(--text); background: var(--hover); }
+.pw__eye:focus-visible { outline: 2px solid var(--brand-500); outline-offset: 1px; }
+
+/* Pressed = the password is currently visible. Colouring it makes that state
+   readable at a glance, which matters when somebody steps away from a screen. */
+.pw__eye[aria-pressed="true"] { color: var(--brand-500); }
+
+/* ==========================  THE REALTOR BAR  ===========================
+   Pinned under the portal nav, on every page.
+
+   A buyer looking at a ₦90m flat has questions the software cannot answer — is
+   the road tarred, what is the service charge, can I see it on Saturday.
+   Putting the person who CAN answer behind a Support tab means the question
+   gets asked to nobody, and a buyer who cannot reach anybody stops browsing.
+   ========================================================================= */
+
+.realtor-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.realtor-bar__in {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 10px var(--s-6);
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+
+.realtor-bar__who { display: grid; line-height: 1.25; min-width: 0; }
+
+.realtor-bar__who .k {
+  font-size: var(--t-xs);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-4);
+}
+
+.realtor-bar__who .v { font-size: var(--t-md); font-weight: 600; }
+
+@media (max-width: 720px) {
+  .realtor-bar { position: static; }
+  .realtor-bar__in { padding: 10px var(--s-4); }
+  /* The address is the first thing to go — the call and message buttons are
+     what somebody on a phone is actually reaching for. */
+  .realtor-bar__mail { display: none; }
+}
+
+/* =============================  ASK SURFACES  ===========================
+   Shared by the buyer's and the realtor's Ask pages. The console has its own,
+   richer answer card; these two are deliberately simpler — one question, one
+   answer, and something to do about it.
+   ========================================================================= */
+
+.askbar {
+  display: flex;
+  gap: var(--s-3);
+  align-items: center;
+}
+
+.askbar input {
+  flex: 1;
+  min-width: 0;
+  height: 46px;
+  padding: 0 var(--s-5);
+  font-size: var(--t-md);
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-md);
+  color: var(--text);
+}
+
+.askbar input:focus-visible {
+  outline: none;
+  border-color: var(--brand-500);
+  box-shadow: 0 0 0 3px var(--brand-glow);
+}
+
+.askbar .btn { height: 46px; padding-inline: var(--s-5); }
+
+/* --------------------------------------------------------------- chips */
+
+.askchips { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+
+.askchip {
+  font: inherit;
+  font-size: var(--t-sm);
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: border-color var(--fast) var(--ease), color var(--fast) var(--ease),
+              background var(--fast) var(--ease);
+}
+
+.askchip:hover {
+  border-color: var(--brand-edge);
+  background: var(--brand-glow);
+  color: var(--text);
+}
+
+.askchip:focus-visible { outline: 2px solid var(--brand-500); outline-offset: 2px; }
+
+/* -------------------------------------------------------------- answers */
+
+.answer {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--s-5);
+  display: grid;
+  gap: var(--s-4);
+}
+
+/* The question is echoed back, so a page of answers stays readable and a
+   misread question is visible rather than hidden behind fluent prose. */
+.answer__q {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--t-sm);
+  color: var(--text-3);
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.answer__h {
+  font-size: var(--t-xl);
+  font-weight: 640;
+  letter-spacing: -.02em;
+  line-height: 1.25;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.answer__n {
+  font-size: var(--t-md);
+  line-height: 1.65;
+  color: var(--text-2);
+  margin: 0;
+  max-width: 74ch;
+}
+
+.answer__n b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.answer__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex-wrap: wrap;
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--border);
+}
+
+/* ------------------------------------------------------- option rows */
+
+.answer__list { display: grid; gap: var(--s-2); }
+
+.optrow {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-4);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+
+a.optrow:hover { border-color: var(--brand-edge); background: var(--brand-glow); }
+a.optrow:focus-visible { outline: 2px solid var(--brand-500); outline-offset: 2px; }
+
+.optrow__id { min-width: 0; flex: 1; display: grid; gap: 2px; }
+.optrow__t { font-weight: 600; line-height: 1.3; }
+.optrow__s { font-size: var(--t-sm); color: var(--text-3); }
+
+.optrow__v { text-align: right; display: grid; gap: 2px; flex: none; }
+.optrow__v .v {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--brand-600, var(--brand-500));
+}
+.optrow__v .n { font-size: var(--t-xs); color: var(--text-3); }
+
+@media (max-width: 620px) {
+  .askbar { flex-wrap: wrap; }
+  .askbar input { flex-basis: 100%; }
+  .optrow { flex-wrap: wrap; }
+  .optrow__v { text-align: left; }
+}
+
+/* =====================  PROPERTY CARDS AND FILTERS  =====================
+   Moved here from public.css, which only the marketing and realtor layouts
+   load.
+
+   The portal uses the very same markup on /portal/browse and was rendering it
+   with NO grid, NO card, NO image ratio and NO filter bar — a wall of raw
+   text and full-size photographs. It is not a marketing component; it is a
+   shared one, and a shared component belongs in the stylesheet every layout
+   loads rather than in one that three of the four happen to include.
+
+   Importing public.css into the portal would have fixed the symptom and
+   imported a SECOND, conflicting `.field` rule with it — which is the "two
+   files fighting over one component" this file already warns about below.
+   ========================================================================= */
+
+.pgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(288px, 1fr));
+  gap: var(--s-5);
+}
+
+.pcard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color var(--fast) var(--ease), transform var(--fast) var(--ease);
+}
+
+.pcard:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+}
+
+.pcard__art { aspect-ratio: 16 / 10; position: relative; background: var(--surface-2); }
+
+/* The artwork itself is styled in components.css — every layout loads that
+   one, and two files fighting over one component is how spacing bugs start. */
+
+.pcard__tag {
+  position: absolute;
+  top: var(--s-3);
+  left: var(--s-3);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-full);
+  padding: 3px 10px;
+  font-size: var(--t-xs);
+  font-weight: 500;
+  backdrop-filter: blur(6px);
+}
+
+.pcard__b { padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-2); flex: 1; }
+
+.pcard__t {
+  font-size: var(--t-md);
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.pcard__loc { font-size: var(--t-sm); color: var(--text-3); }
+
+.pcard__price {
+  font-size: var(--t-xl);
+  font-weight: 600;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+  margin-top: auto;
+}
+
+.pcard__per {
+  font-size: var(--t-sm);
+  color: var(--text-2);
+  border-top: 1px dashed var(--border-2);
+  padding-top: var(--s-3);
+  margin-top: var(--s-1);
+}
+
+.pcard__per b { font-variant-numeric: tabular-nums; }
+
+.pcard__meta {
+  display: flex;
+  gap: var(--s-3);
+  font-size: var(--t-sm);
+  color: var(--text-3);
+  flex-wrap: wrap;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  align-items: center;
+  margin-bottom: var(--s-5);
+  padding: var(--s-4);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+
+/* Four featured cards, so the row fills rather than leaving a dead column. */
+.pgrid--four { grid-template-columns: repeat(auto-fill, minmax(252px, 1fr)); }
+
+@media (max-width: 1100px) {
+  .pgrid--four { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+}

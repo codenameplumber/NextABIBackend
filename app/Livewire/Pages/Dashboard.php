@@ -4,7 +4,12 @@ namespace App\Livewire\Pages;
 
 use App\Livewire\Concerns\InteractsWithEngine;
 use App\Models\ActionLog;
+use App\Models\Agent;
+use App\Models\CommissionPayout;
+use App\Models\Customer;
+use App\Models\Deal;
 use App\Models\Recommendation;
+use App\Models\User;
 use App\Support\Fmt;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
@@ -73,7 +78,37 @@ class Dashboard extends Component
             'impact' => $this->engine()->impactOnTable($feed),
             'brief' => $this->narrator()->brief($headline, $feed),
             'log' => ActionLog::with('insight')->latest()->limit(4)->get(),
+
+            // The three figures this platform is asked for before anything
+            // else: how many people are on it, what it has taken, and who is
+            // selling. The engine below answers "why"; these answer "how big".
+            'platform' => $this->platform(),
         ]);
+    }
+
+    /**
+     * Platform scale.
+     *
+     * Counted rather than derived from the metrics layer: these are questions
+     * about the platform itself, not about the business it is analysing, and
+     * pushing them through a cached aggregate would mean a realtor approved a
+     * minute ago does not appear for ten.
+     */
+    private function platform(): array
+    {
+        $sold = Deal::whereIn('status', array_merge(Deal::LIVE, ['completed']));
+
+        return [
+            'users' => (int) User::count(),
+            'investors' => (int) Customer::count(),
+            'unassigned' => (int) Customer::query()->unassigned()->count(),
+            'realtors' => (int) Agent::query()->approved()->count(),
+            'realtorsPending' => (int) Agent::query()->pending()->count(),
+            'commitments' => (int) (clone $sold)->count(),
+            'commitmentsPending' => (int) Deal::where('status', 'pending')->count(),
+            'soldValue' => (float) (clone $sold)->sum('value'),
+            'commissionOwed' => (float) CommissionPayout::where('status', 'owed')->sum('amount'),
+        ];
     }
 
     /**

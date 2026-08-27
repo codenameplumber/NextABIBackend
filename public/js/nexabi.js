@@ -168,14 +168,56 @@ function bindKeys() {
   });
 }
 
+
+/* ------------------------------------------------------------- copy-to-clipboard
+   A realtor copies their link a dozen times a day, so the affordance is a
+   click on the thing itself rather than a modal with a text field. Delegated,
+   because Livewire replaces DOM subtrees wholesale and a bound handler would
+   not survive the morph.                                                      */
+
+function bindCopy() {
+  if (document.__nexabiCopyBound) return;
+  document.__nexabiCopyBound = true;
+
+  document.addEventListener("click", async (e) => {
+    const el = e.target.closest("[data-copy]");
+    if (!el) return;
+
+    const text = el.getAttribute("data-copy");
+    if (!text) return;
+
+    e.preventDefault();
+
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Older browsers, and any page not served over TLS, refuse the
+      // clipboard API outright. The fallback is ugly and always works.
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); } catch { /* nothing left to try */ }
+      document.body.removeChild(ta);
+    }
+
+    toast({ title: "Copied", msg: text.length > 54 ? text.slice(0, 51) + "\u2026" : text, kind: "pos" });
+  });
+}
+
 /* ----------------------------------------------------------------- boot */
 
 function boot() {
   mountCharts();
   bindChrome();
   bindKeys();
+  bindCopy();
 
-  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  // Light is the default the layouts stamp, so the toggle icon has to agree.
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
   document.querySelectorAll('[data-theme-toggle]').forEach((b) => {
     clear(b);
     b.appendChild(icon(current === 'dark' ? 'sun' : 'moon', 15));

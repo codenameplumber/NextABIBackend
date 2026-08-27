@@ -1,9 +1,6 @@
 <div>
     <a class="brandmark" href="{{ route('app.dashboard') }}" wire:navigate>
-        <svg class="brandmark__logo" viewBox="0 0 100 100" width="30" height="30">
-            <rect width="100" height="100" rx="24" fill="var(--brand-500)"/>
-            <path d="M28 72V28h11l22 30V28h11v44H61L39 42v30z" fill="#171614"/>
-        </svg>
+        <x-logo variant="mark" :height="30" class="brandmark__logo" />
         <div class="brandmark__text">
             <div class="brandmark__name">NexABI</div>
             <div class="brandmark__tag">Adaptive Business Intelligence</div>

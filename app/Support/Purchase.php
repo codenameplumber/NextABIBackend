@@ -25,13 +25,40 @@ class Purchase
     /** @var Collection<int, Payment> */
     public readonly Collection $payments;
 
-    public function __construct(public readonly Customer $customer)
-    {
-        // The largest won deal — a customer with two purchases is looking at
-        // the one that matters, not whichever the database returned first.
+    /**
+     * @param  ?\App\Models\Deal  $only  a specific commitment to build against,
+     *                                   rather than whichever is in focus
+     */
+    public function __construct(
+        public readonly Customer $customer,
+        ?\App\Models\Deal $only = null,
+    ) {
+        if ($only) {
+            $this->deal = $only->loadMissing('property');
+            $this->property = $this->deal->property;
+            $this->agent = $customer->agent;
+            $this->payments = Payment::where('deal_id', $this->deal->id)
+                ->orderBy('instalment')->get();
+
+            return;
+        }
+
+        /**
+         * The commitment that matters to this buyer right now.
+         *
+         * A LIVE plan outranks a settled one however large: somebody still
+         * paying wants to see what they owe, not the flat they finished paying
+         * for two years ago. Ordering only by value used to work because every
+         * deal was already closed — under the new lifecycle an approved
+         * commitment is not `won` until the last instalment lands, so filtering
+         * on that alone hides the purchase somebody just made.
+         */
         $this->deal = $customer->deals()
             ->with('property')
-            ->where('won', true)
+            ->where(fn ($q) => $q->whereIn('status', \App\Models\Deal::LIVE)
+                ->orWhere('status', 'completed')
+                ->orWhere('won', true))
+            ->orderByRaw("FIELD(status, 'active', 'approved', 'completed') ")
             ->orderByDesc('value')
             ->first();
 
@@ -46,6 +73,39 @@ class Purchase
     public static function for(Customer $customer): self
     {
         return new self($customer);
+    }
+
+    /**
+     * Every commitment this investor holds, newest first.
+     *
+     * Buying a second property used to be impossible — a buyer's file was
+     * whatever the agency had sold them. Now that they can browse and commit
+     * themselves, a portal that shows one purchase and silently hides the rest
+     * is worse than one that never offered a second.
+     *
+     * @return Collection<int, self>
+     */
+    public static function portfolio(Customer $customer): Collection
+    {
+        return $customer->deals()
+            ->with('property')
+            ->where(fn ($q) => $q->whereIn('status', \App\Models\Deal::LIVE)
+                ->orWhere('status', 'completed')
+                ->orWhere('won', true))
+            ->orderByRaw("FIELD(status, 'active', 'approved', 'completed')")
+            ->orderByDesc('value')
+            ->get()
+            ->map(fn ($deal) => new self($customer, $deal));
+    }
+
+    /** Commitments still waiting on an admin. No plan exists for these yet. */
+    public static function awaiting(Customer $customer): Collection
+    {
+        return $customer->deals()
+            ->with('property')
+            ->where('status', 'pending')
+            ->orderByDesc('committed_at')
+            ->get();
     }
 
     /* --------------------------------------------------------- groupings */

@@ -12,8 +12,13 @@ use Tests\TestCase;
  *
  * Two properties matter more than breadth. First, the parse has to be right —
  * "top 5 agents by revenue" ranks agents, not revenue. Second, a question it
- * cannot answer has to come back as "I can't answer that", never as a
- * confident wrong number.
+ * cannot answer has to come back saying so, never as a confident wrong number.
+ *
+ * The suite runs with the model disabled, which is the strict case: the AI
+ * fallback behind the router returns null without a key, so anything the
+ * router cannot place lands on the refusal exactly as it always did. A live
+ * key can only turn a refusal into an answer, never the reverse — every
+ * assertion below is on `kind`, not on the wording.
  */
 class AskEngineTest extends TestCase
 {

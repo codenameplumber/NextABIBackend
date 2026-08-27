@@ -6,6 +6,9 @@ use App\Engine\InsightEngine;
 use App\Engine\Metrics;
 use App\Engine\Stats;
 use App\Models\Agent;
+use App\Models\Customer;
+use App\Models\Deal;
+use App\Models\Payment;
 use App\Models\Tenant;
 use App\Support\Fmt;
 use App\Support\Vocab;
@@ -28,11 +31,19 @@ use App\Support\Vocab;
  */
 class AskEngine
 {
+    private NarratorContract $narrator;
+
     public function __construct(
         private Tenant $tenant,
         private Metrics $metrics,
         private InsightEngine $engine,
-    ) {}
+        ?NarratorContract $narrator = null,
+    ) {
+        // Optional so the three existing call sites keep working unchanged.
+        // It is only ever reached after the router has already failed, so a
+        // caller that does not pass one still gets every routed answer.
+        $this->narrator = $narrator ?? app(NarratorContract::class);
+    }
 
     /* ------------------------------------------------------------ grammar */
 
@@ -59,6 +70,18 @@ class AskEngine
         'pipeline' => '/\b(pipeline|potential|opportunit)/i',
         'overdue' => '/\b(overdue|arrears|outstanding|receivable|unpaid|debt|late)\b/i',
         'collections' => '/\b(collect|payments? received|cash|collection ratio)/i',
+
+        /* The platform entities the instalment product added. All four sit
+           ABOVE the generic patterns they would otherwise be swallowed by:
+           "how many commitments are pending" contains "commitment", but it
+           also contains nothing else — while "unassigned investors" would be
+           eaten by `customers`, and "realtors" by `agents`, if either of those
+           came first. */
+        'commitments' => '/\b(commitments?|approval queue|awaiting approval|pending approval|to approve)\b/i',
+        'unassigned' => '/\b(unassigned|no realtor|without a realtor|nobody assigned)\b/i',
+        'instalments' => '/\b(instal+ments?|repayments?|payment plans?|payment schedules?)\b/i',
+        'realtors' => '/\b(realtors?)\b/i',
+
         'satisfaction' => '/\b(satisf|happy|rating|reviews?|nps|sentiment)/i',
         'complaints' => '/\b(complain|feedback|unhappy|detractor)/i',
         'dom' => '/\b(days on market|time to sell|how long.*sell|dom)\b/i',
@@ -83,11 +106,24 @@ class AskEngine
         'month' => '/\bby (month|monthly|over time)\b/i',
     ];
 
+    /**
+     * ORDER MATTERS HERE TOO, and `causal` has to beat `recommend`.
+     *
+     * Almost every question worth asking of this product has the shape "why is
+     * X happening and what should I do about it" — which matches both. With
+     * `recommend` first, the router threw away the "why is X" half and
+     * answered with a generic list of every outstanding recommendation in the
+     * business, for a question that named one specific thing. Technically a
+     * reply; useless as an answer.
+     *
+     * `recommend` still wins on a bare "what should I do next?", which is the
+     * question it was actually written for.
+     */
     private const INTENTS = [
         'help' => '/^(help|what can you|what do you|how do i use|capabilities)/i',
-        'recommend' => '/\b(what should (i|we)|recommend|advise|next step|action|priorit)/i',
         'risk' => '/\b(risk|worry|worried|concern|problem|wrong|attention|urgent|alert)/i',
         'causal' => '/\b(why|what caused|reason|explain|driving|because)\b/i',
+        'recommend' => '/\b(what should (i|we)|recommend|advise|next step|action|priorit)/i',
         'ranking' => '/\b(top|best|worst|highest|lowest|rank|leading|underperform|strongest|weakest|most|least)\b/i',
         'trend' => '/\b(trend|trending|over time|growth|growing|declining|falling|rising|month over month|compare)\b/i',
         'forecast' => '/\b(forecast|predict|projection|next month|next quarter|expect|will (we|i))\b/i',
@@ -116,6 +152,10 @@ class AskEngine
         'Lead volume, quality, staleness and conversion by source',
         'Property inventory, demand by segment and time on market',
         'Overdue payments, collection ratio and receivables aging',
+        'Instalments recorded, still scheduled, and what is late',
+        'Commitments awaiting approval, and which ones are blocked',
+        'Realtors — approved, waiting, and who is producing',
+        'Investors with no realtor attached, and how many',
         'Marketing spend, CPL, CAC and ROAS by campaign or channel',
         'Customer lifetime value, satisfaction and detractors',
         'Rankings — best or worst agents, sources, locations, campaigns',
@@ -124,8 +164,29 @@ class AskEngine
 
     /* --------------------------------------------------------------- ask */
 
-    public function ask(string $question): array
+    /**
+     * @param  ?int  $fromInsight  a finding this question was asked *about*
+     */
+    public function ask(string $question, ?int $fromInsight = null): array
     {
+        /**
+         * A question arriving from a finding's "Find out more" is answered
+         * about that finding, full stop.
+         *
+         * The router is very good at "how much is overdue" and hopeless at
+         * "why is the Meta - Lagos Mainland Push campaign underperforming",
+         * because nothing in that sentence is a metric it knows — so it
+         * extracted no metric, matched no area, and replied with whatever the
+         * highest-priority finding in the whole business happened to be. A
+         * confident answer about an unrelated block of flats.
+         *
+         * Carrying the id removes the guesswork entirely. The user clicked a
+         * specific card; there is no ambiguity to resolve.
+         */
+        if ($fromInsight && $found = $this->resolveFinding($fromInsight)) {
+            return [...$found, 'parsed' => $this->classify($question), 'question' => $question];
+        }
+
         $p = $this->classify($question);
 
         $res = match ($p['intent']) {
@@ -210,6 +271,8 @@ class AskEngine
             'sub' => null,
             'change' => null,
             'narrative' => null,
+            /** Set only by resolveFinding — the single thing to do about it. */
+            'todo' => null,
             'confidence' => 0.85,
             'factors' => [],
             'items' => [],
@@ -620,7 +683,7 @@ class AskEngine
                         ])->all(),
                         'opts' => ['format' => 'count', 'height' => 200],
                     ]],
-                    'drill' => ['label' => 'Open feedback', 'route' => route('app.feedback')],
+                    'drill' => ['label' => 'Open investors', 'route' => route('app.customers')],
                 ];
             },
 
@@ -635,7 +698,7 @@ class AskEngine
                     'narrative' => $b(Fmt::num($fb['negative'])).' of '.$b(Fmt::num($fb['window']))
                         .' reviews in the last 60 days were one or two stars — a '
                         .$b(Fmt::pct($fb['negativeRate'], 0)).' negative rate. Top themes: '.$themes.'.',
-                    'drill' => ['label' => 'Open feedback', 'route' => route('app.feedback')],
+                    'drill' => ['label' => 'Open investors', 'route' => route('app.customers')],
                 ];
             },
 
@@ -747,6 +810,109 @@ class AskEngine
                 ];
             },
 
+            /* ------------------------------------------- the instalment product
+               These four read the platform tables directly rather than going
+               through the metrics layer, which predates the pivot and has no
+               group for any of them. They are cheap counts on indexed columns,
+               and the alternative — a tenth metric group — is a much larger
+               change to make in service of four questions. */
+
+            'commitments' => function () use ($b) {
+                $counts = Deal::query()->whereNotNull('committed_at')
+                    ->selectRaw('status, COUNT(*) c, COALESCE(SUM(value),0) v')
+                    ->groupBy('status')->get()->keyBy('status');
+
+                $n = fn ($s) => (int) ($counts[$s]->c ?? 0);
+                $v = fn ($s) => (float) ($counts[$s]->v ?? 0);
+                $pending = $n('pending');
+                $live = $n('approved') + $n('active');
+
+                // The blocked count is the number worth surfacing: a pending
+                // commitment whose investor has no realtor cannot be approved
+                // at all, and it is invisible in a plain status breakdown.
+                $blocked = Deal::query()->where('status', 'pending')
+                    ->whereHas('customer', fn ($q) => $q->whereNull('agent_id'))->count();
+
+                return [
+                    'headline' => Fmt::num($pending),
+                    'sub' => 'commitments awaiting approval',
+                    'narrative' => $b(Fmt::num($pending)).' '
+                        .($pending === 1 ? 'commitment is' : 'commitments are').' waiting for approval, '
+                        .'worth '.$b(Fmt::moneyShort($v('pending'))).'. '
+                        .($blocked > 0
+                            ? $b(Fmt::num($blocked)).' of them cannot be approved yet because the '
+                              .'investor has no realtor attached — assign one and the block clears. '
+                            : 'None of them are blocked. ')
+                        .$b(Fmt::num($live)).' '.($live === 1 ? 'plan is' : 'plans are')
+                        .' live and paying, and '.$b(Fmt::num($n('completed'))).' have settled in full.',
+                    'drill' => ['label' => 'Open the approval queue', 'route' => route('app.commitments')],
+                ];
+            },
+
+            'unassigned' => function () use ($b) {
+                $unassigned = Customer::query()->unassigned()->count();
+                $total = Customer::count();
+
+                return [
+                    'headline' => Fmt::num($unassigned),
+                    'sub' => 'investors with no realtor attached',
+                    'narrative' => $unassigned === 0
+                        ? 'Every one of your '.$b(Fmt::num($total)).' investors has a realtor '
+                          .'attached, so nothing is blocked at approval.'
+                        : $b(Fmt::num($unassigned)).' of '.$b(Fmt::num($total)).' investors ('
+                          .$b(Fmt::pct(Stats::safeDiv($unassigned, $total), 1))
+                          .') arrived without a referral code and have nobody attached. That is not '
+                          .'missing data — it is the queue. None of them can have a commitment '
+                          .'approved until a realtor is assigned, because commission has to have an '
+                          .'owner.',
+                    'drill' => ['label' => 'Open the unassigned queue',
+                        'route' => route('app.customers', ['filter' => 'unassigned'])],
+                ];
+            },
+
+            'instalments' => function () use ($b) {
+                $paid = (int) Payment::whereNotNull('paid_at')->count();
+                $collected = (float) Payment::whereNotNull('paid_at')->sum('amount');
+                $scheduled = (int) Payment::whereNull('paid_at')->count();
+                $remaining = (float) Payment::whereNull('paid_at')->sum('amount');
+                $lateCount = (int) Payment::whereNull('paid_at')->where('due_at', '<=', now())->count();
+
+                return [
+                    'headline' => Fmt::num($paid),
+                    'sub' => 'instalments recorded',
+                    'narrative' => $b(Fmt::num($paid)).' instalments totalling '
+                        .$b(Fmt::moneyShort($collected)).' have been received. '
+                        .$b(Fmt::num($scheduled)).' remain scheduled, worth '
+                        .$b(Fmt::moneyShort($remaining)).', of which '.$b(Fmt::num($lateCount))
+                        .' '.($lateCount === 1 ? 'is' : 'are').' already due or past due.',
+                    'drill' => ['label' => 'Open finance', 'route' => route('app.finance')],
+                ];
+            },
+
+            'realtors' => function () use ($m, $b) {
+                $approved = Agent::query()->approved()->count();
+                $pending = Agent::query()->pending()->count();
+                $a = $m->agents();
+                $top = collect($a['rows'])->sortByDesc('revenue')->first();
+
+                return [
+                    'headline' => Fmt::num($approved),
+                    'sub' => 'approved realtors',
+                    'narrative' => $b(Fmt::num($approved)).' realtors are approved and able to bring '
+                        .'buyers in'
+                        .($pending > 0
+                            ? ', and '.$b(Fmt::num($pending)).' '.($pending === 1 ? 'is' : 'are')
+                              .' waiting on approval — until that happens they have no code and no '
+                              .'link, so they cannot capture anybody'
+                            : ', with nobody waiting on approval')
+                        .'. Median close rate across the book is '
+                        .$b(Fmt::pct($a['baselineCloseRate'], 0))
+                        .($top ? ', and the strongest producer is '.$b($top['name']).' on '
+                            .$b(Fmt::moneyShort($top['revenue'])) : '').'.',
+                    'drill' => ['label' => 'Open realtors', 'route' => route('app.realtors')],
+                ];
+            },
+
             'agents' => function () use ($m, $b) {
                 $a = $m->agents();
 
@@ -792,8 +958,139 @@ class AskEngine
         ]);
     }
 
+    /**
+     * The full explanation of one finding.
+     *
+     * Everything the engine knows about it, assembled into a single answer:
+     * what was detected, the narrated figures behind it, what to do and why
+     * that is the recommendation, what else is going on in the same area, and
+     * the evidence with its drill-throughs intact.
+     *
+     * This is the deep end of "Find out more" — the card said three sentences,
+     * and this says all of it.
+     */
+    private function resolveFinding(int $id): ?array
+    {
+        $insight = \App\Models\Insight::with('recommendations')->find($id);
+
+        if (! $insight || ! $insight->isLive()) {
+            return null;
+        }
+
+        $rec = $insight->primaryRecommendation();
+
+        // Carried as its own field rather than appended to the narrative:
+        // Fmt::rich collapses all whitespace, so a paragraph break inside the
+        // prose would have arrived as a single space and run the advice on to
+        // the end of the explanation.
+        $todo = $rec ? [
+            'label' => $rec->label,
+            'why' => $rec->rationale,
+            'impact' => $rec->impact > 0 ? Fmt::moneyShort($rec->impact) : null,
+        ] : null;
+
+        // Everything else flagged in the same area. A finding rarely stands
+        // alone, and the neighbouring ones are usually the context that
+        // explains it.
+        $siblings = collect($this->engine->live($insight->area))
+            ->reject(fn ($i) => $i->id === $insight->id)
+            ->take(4);
+
+        return $this->answer([
+            'kind' => 'causal',
+            'headline' => $insight->title,
+            'sub' => (InsightEngine::AREAS[$insight->area] ?? $insight->area)
+                .' · '.Fmt::titleCase($insight->detector).' detector',
+            'narrative' => $this->narrator->narrate($insight),
+            'todo' => $todo,
+            // The evidence, as the contributing factors — each keeping the
+            // drill-through it carried on the card.
+            'factors' => collect($insight->evidence ?? [])->map(fn ($e) => [
+                'label' => $e['label'],
+                'value' => Fmt::evidence($e),
+                'note' => null,
+                'route' => isset($e['drill'])
+                    ? route(InsightEngine::areaRoute($e['drill']['route']), $e['drill']['params'] ?? [])
+                    : null,
+            ])->all(),
+            'items' => $siblings->map(fn ($i) => [
+                'title' => $i->title,
+                'band' => $i->band,
+                'area' => $i->area,
+                'route' => route('app.insights', ['id' => $i->id]),
+            ])->all(),
+            'drill' => ['label' => 'Open this finding', 'route' => route('app.insights', ['id' => $insight->id])],
+            'confidence' => (float) $insight->confidence,
+        ]);
+    }
+
+    /**
+     * A question that names one channel, answered about that channel.
+     *
+     * "Why is Billboard converting worse than my other sources" used to fall
+     * through to the generic leads answer, which reported total lead volume
+     * and never mentioned Billboard — a confident reply to a question nobody
+     * asked. The entity was extracted during classification all along; nothing
+     * downstream was reading it.
+     */
+    private function resolveSource(array $p): ?array
+    {
+        if (! $p['source']) {
+            return null;
+        }
+
+        $l = $this->metrics->leads();
+        $rows = collect($l['bySource']);
+        $row = $rows->firstWhere('key', $p['source']);
+
+        if (! $row || ! $row['leads']) {
+            return null;
+        }
+
+        $median = Stats::median($rows->pluck('conversion')->map(fn ($v) => (float) $v)->all());
+        $best = $rows->sortByDesc('conversion')->first();
+        $b = fn ($s) => $this->b($s);
+        $share = Stats::safeDiv($row['leads'], max(1, $l['total']));
+
+        return $this->answer([
+            'kind' => 'causal',
+            'headline' => Fmt::pct($row['conversion'], 2),
+            'sub' => $p['source'].' conversion',
+            'narrative' => $b($p['source']).' has produced '.$b(Fmt::num($row['leads']))
+                .' leads — '.$b(Fmt::pct($share, 0)).' of everything you have captured — and closed '
+                .$b(Fmt::num($row['won'])).' of them, a '.$b(Fmt::pct($row['conversion'], 2))
+                .' conversion rate against a median of '.$b(Fmt::pct($median, 2))
+                .' across your channels. Its average lead score is '
+                .$b((string) round($row['avgScore'])).', and it is still holding '
+                .$b(Fmt::moneyShort($row['pipeline'])).' of open pipeline. Your strongest channel is '
+                .$b($best['key']).' at '.$b(Fmt::pct($best['conversion'], 2)).'.',
+            'table' => [
+                'columns' => ['Source', 'Leads', 'Won', 'Conversion', 'Open pipeline'],
+                'rows' => $rows->sortByDesc('leads')->take(10)->map(fn ($r) => [
+                    $r['key'], Fmt::num($r['leads']), Fmt::num($r['won']),
+                    Fmt::pct($r['conversion'], 2), Fmt::moneyShort($r['pipeline']),
+                ])->values()->all(),
+            ],
+            'chart' => ['kind' => 'bar', 'payload' => [
+                'data' => $rows->sortByDesc('conversion')->map(fn ($r) => [
+                    'label' => $r['key'],
+                    'value' => round($r['conversion'] * 100, 2),
+                    'color' => $r['key'] === $p['source'] ? 'var(--c2)' : 'var(--c1)',
+                ])->values()->all(),
+                'opts' => ['format' => 'number', 'height' => 210],
+            ]],
+            'drill' => ['label' => 'Open leads', 'route' => route('app.leads')],
+            'confidence' => 0.88,
+        ]);
+    }
+
     private function resolveCausal(array $p): ?array
     {
+        // A named channel outranks the generic area answer.
+        if ($named = $this->resolveSource($p)) {
+            return $named;
+        }
+
         $area = $this->metricToArea($p['metric']);
         $related = collect($this->engine->live())
             ->filter(fn ($i) => ! $area || $i->area === $area)
@@ -946,7 +1243,150 @@ class AskEngine
         ]);
     }
 
+    /**
+     * Everything the engine knows, flattened into one sheet of figures.
+     *
+     * Handed to the narrator when the router cannot resolve a question. It is
+     * FIGURES ONLY — nine metric groups, the platform counters, and the titles
+     * of what is currently flagged. No rows, no names of individual customers,
+     * nothing the model could reshape into a claim about a specific person.
+     *
+     * That constraint is what makes the fallback safe to ship. The model's job
+     * is to find which of these numbers answers the question and say so in a
+     * sentence; it is structurally unable to produce a figure that is not
+     * already on this list.
+     */
+    private function factSheet(): array
+    {
+        $m = $this->metrics;
+        $s = $m->sales(90);
+        $l = $m->leads(90);
+        $pr = $m->properties();
+        $f = $m->finance();
+        $mk = $m->marketing();
+        $c = $m->customers();
+        $fb = $m->feedback();
+        $a = $m->agents();
+
+        $top = fn (array $rows, string $key, int $n = 5) => collect($rows)->take($n)
+            ->map(fn ($r) => $r['key'].' ('.$r[$key].')')->implode(', ');
+
+        return [
+            /* sales */
+            'revenue_last_90_days' => $s['revenue'],
+            'revenue_change_vs_prior_90' => Fmt::delta($s['revenueChange']),
+            'deals_closed_last_90_days' => $s['deals'],
+            'average_deal_size' => $s['avgDeal'],
+            'win_rate_of_decided_deals' => Fmt::pct($s['winRate'], 1),
+            'average_sales_cycle_days' => round($s['cycleDays']),
+            'commission_last_90_days' => $s['commission'],
+
+            /* leads */
+            'open_leads' => $l['open'],
+            'new_leads_last_90_days' => $l['new'],
+            'open_pipeline_value' => $l['pipeline'],
+            'stale_leads_no_contact_14_days' => $l['stale'],
+            'stale_pipeline_value' => $l['stalePipeline'],
+            'normal_stale_backlog' => $l['staleBaseline'],
+            'hot_leads_score_70_plus' => $l['hot'],
+            'lead_to_sale_conversion' => Fmt::pct($l['conversion'], 2),
+            'lead_sources_by_volume' => $top($l['bySource'], 'leads'),
+
+            /* properties */
+            'properties_available' => $pr['available'],
+            'properties_reserved' => $pr['reserved'],
+            'properties_sold' => $pr['sold'],
+            'inventory_value_available' => $pr['inventoryValue'],
+            'average_listing_price' => $pr['avgPrice'],
+            'median_days_on_market' => round($pr['domMedian']),
+            'stale_listings_over_twice_median_dom' => $pr['stale'],
+            'stale_listing_value' => $pr['staleValue'],
+            'sell_through_rate' => Fmt::pct($pr['sellThrough'], 1),
+            'locations_by_listing_count' => $top($pr['byLocation'], 'listings', 6),
+            'property_types_by_listing_count' => $top($pr['byType'], 'listings', 6),
+
+            /* finance */
+            'total_collected' => $f['collected'],
+            'total_outstanding' => $f['outstanding'],
+            'overdue_amount' => $f['overdueAmount'],
+            'overdue_instalment_count' => $f['overdueCount'],
+            'accounts_at_risk' => $f['atRiskAccounts'],
+            'aged_over_90_days' => $f['aging']['90+'] ?? 0,
+            'collection_ratio' => Fmt::pct($f['collectionRatio'], 1),
+            'falling_due_next_30_days' => $f['expected30'],
+
+            /* marketing */
+            'marketing_spend' => $mk['spend'],
+            'cost_per_lead' => $mk['cpl'],
+            'cost_per_customer_acquired' => $mk['cac'],
+            'return_on_ad_spend' => number_format($mk['roas'], 2).'x',
+            'campaign_attributed_leads' => $mk['leads'],
+            'channels_by_spend' => $top($mk['byChannel'], 'spend', 6),
+
+            /* investors and satisfaction */
+            'total_investors' => $c['total'],
+            'combined_lifetime_value' => $c['ltv'],
+            'average_lifetime_value' => $c['avgLtv'],
+            'repeat_buyers' => $c['repeat'],
+            'average_satisfaction_out_of_5' => round($c['satisfaction'], 2),
+            'promoters' => $c['promoters'],
+            'detractors' => $c['detractors'],
+            'reviews_last_60_days' => $fb['window'],
+            'negative_reviews_last_60_days' => $fb['negative'],
+            'top_complaint_themes' => $top($fb['tags'], 'count', 5),
+
+            /* the sales floor */
+            'realtor_count' => count($a['rows']),
+            'median_close_rate' => Fmt::pct($a['baselineCloseRate'], 1),
+            'revenue_share_of_top_three' => Fmt::pct($a['concentration'], 1),
+
+            /* the instalment platform */
+            'commitments_awaiting_approval' => Deal::query()->where('status', 'pending')->count(),
+            'commitments_live_and_paying' => Deal::query()->live()->count(),
+            'commitments_completed' => Deal::query()->where('status', 'completed')->count(),
+            'investors_with_no_realtor_attached' => Customer::query()->unassigned()->count(),
+            'approved_realtors' => Agent::query()->approved()->count(),
+            'realtors_awaiting_approval' => Agent::query()->pending()->count(),
+            'instalments_paid' => Payment::whereNotNull('paid_at')->count(),
+            'instalments_still_scheduled' => Payment::whereNull('paid_at')->count(),
+
+            /* what is currently flagged */
+            'open_findings' => count($this->engine->live()),
+            'open_finding_titles' => collect($this->engine->live())->take(8)
+                ->map(fn ($i) => $i->title)->implode(' | ') ?: 'none',
+        ];
+    }
+
+    /**
+     * The router could not place this question. Try the model before giving up.
+     *
+     * Order matters: the router is tried FIRST and always wins, because a
+     * routed answer comes with a chart, a table and a drill-through to the
+     * rows behind it, and this one is prose. The model is the fallback, not
+     * the front door.
+     */
     private function resolveUnknown(array $p): array
+    {
+        $written = $this->narrator->answer($p['raw'], $this->factSheet());
+
+        if ($written !== null) {
+            return $this->answer([
+                'kind' => 'ai',
+                'headline' => 'From your figures',
+                'narrative' => $written,
+                // Lower than a routed answer on purpose. This one was phrased
+                // from a fact sheet rather than computed against a named
+                // metric, and the card should not claim otherwise.
+                'confidence' => 0.7,
+                'drill' => ['label' => 'Open all findings', 'route' => route('app.insights')],
+            ]);
+        }
+
+        return $this->cannotAnswer($p);
+    }
+
+    /** The honest card. Reached when nothing — router or model — could answer. */
+    private function cannotAnswer(array $p): array
     {
         $guesses = [];
 
@@ -965,11 +1405,13 @@ class AskEngine
 
         return $this->answer([
             'kind' => 'unknown',
-            'headline' => "I can't answer that one yet",
-            'narrative' => 'That question falls outside what I can compute from the current data. '
-                .'Rather than guess at a number, here is what I can tell you — try one of these instead.',
+            'headline' => 'That data is not available',
+            'narrative' => 'I could not answer that from what this business actually records. '
+                .'Rather than guess at a number — which is the one mistake that would make every '
+                .'other figure here worth doubting — I would rather say so. These are close to '
+                .'what you asked and I can answer them.',
             'items' => array_map(fn ($g) => ['title' => $g, 'ask' => $g], $guesses),
-            'confidence' => 0.2,
+            'confidence' => 0.0,
         ]);
     }
 
@@ -1010,6 +1452,18 @@ class AskEngine
         }
         if ($h['overdue'] > 0) {
             $base[] = 'Which customers are late on payments?';
+        }
+
+        // The two queues, surfaced only while they actually have something in
+        // them. A suggested question that returns "none" teaches nothing.
+        if (Deal::query()->where('status', 'pending')->exists()) {
+            array_unshift($base, 'How many commitments are waiting for approval?');
+        }
+        if (Customer::query()->unassigned()->exists()) {
+            $base[] = 'How many investors have no realtor attached?';
+        }
+        if (Agent::query()->pending()->exists()) {
+            $base[] = 'How many realtors are waiting on approval?';
         }
 
         return $base;

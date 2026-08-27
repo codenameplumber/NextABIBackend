@@ -14,6 +14,17 @@ namespace App\Support;
  */
 final class Vocab
 {
+    /**
+     * The name pool has to be bigger than the book.
+     *
+     * At 4,500 leads a 2,200-combination pool collides constantly and the
+     * simulator's fallback starts appending digits — "Chidi Okafor 7" — which
+     * is the single detail that makes a dataset read as generated. 128 × 96 is
+     * roughly 12,000 combinations against a book of about 5,000 people.
+     *
+     * Igbo, Yoruba and Hausa names in roughly the proportions a Lagos agency's
+     * client book actually carries.
+     */
     public const FIRST = [
         'Chidi', 'Adaeze', 'Emeka', 'Ngozi', 'Tunde', 'Folake', 'Bola', 'Yemi', 'Kunle', 'Amaka',
         'Ifeanyi', 'Zainab', 'Musa', 'Aisha', 'Segun', 'Bimpe', 'Obinna', 'Chioma', 'Femi', 'Tolu',
@@ -21,6 +32,15 @@ final class Vocab
         'Gbenga', 'Ronke', 'Ahmed', 'Fatima', 'Olumide', 'Temitope', 'Ikenna', 'Grace', 'Sadiq',
         'Maryam', 'Bayo', 'Titi', 'Nnamdi', 'Ejiro', 'Hassan', 'Rukayat', 'Dele', 'Sade', 'Chinaza',
         'Kelechi', 'Abiodun', 'Nkechi', 'Wale', 'Bisi', 'Osaze',
+        'Chukwuemeka', 'Oluwaseun', 'Adanna', 'Babatunde', 'Ifechukwu', 'Olamide', 'Ugochi',
+        'Abdulrahman', 'Chinelo', 'Oluwatobi', 'Ezinne', 'Adewale', 'Nkiru', 'Kayode', 'Chiamaka',
+        'Omolara', 'Ifunanya', 'Sikiru', 'Onyinye', 'Taiwo', 'Kehinde', 'Adaobi', 'Lanre',
+        'Chidinma', 'Aminu', 'Simisola', 'Obiageli', 'Rotimi', 'Hauwa', 'Chukwudi', 'Yetunde',
+        'Ngozika', 'Jide', 'Amina', 'Somtochukwu', 'Bukola', 'Ikechukwu', 'Aderonke', 'Nasir',
+        'Chinyere', 'Oluwadamilare', 'Ebele', 'Toyin', 'Suleiman', 'Ahunna', 'Bode', 'Zubaida',
+        'Chidubem', 'Morenike', 'Ifeoma', 'Sesan', 'Halimat', 'Obiora', 'Folasade', 'Uzoamaka',
+        'Akin', 'Rashidat', 'Chibuzo', 'Iyabo', 'Garba', 'Adaeke', 'Niyi', 'Sekinat',
+        'Chimezie', 'Bolanle', 'Umar', 'Nwabueze', 'Modupe', 'Idris', 'Chiazor', 'Doyin',
     ];
 
     public const LAST = [
@@ -29,6 +49,13 @@ final class Vocab
         'Anyanwu', 'Oyelaran', 'Danjuma', 'Iwu', 'Akinola', 'Nwachukwu', 'Lawal', 'Obi', 'Sanusi',
         'Ajayi', 'Onyeka', 'Yusuf', 'Emenike', 'Adeleke', 'Nwankwo', 'Oladipo', 'Afolabi', 'Chukwuma',
         'Bakare', 'Ezeugo', 'Aliyu', 'Okoro',
+        'Adesanya', 'Nnaji', 'Oyewole', 'Madu', 'Sowande', 'Igwe', 'Bamidele', 'Okeke', 'Alabi',
+        'Ugochukwu', 'Oduya', 'Nwaogu', 'Aregbesola', 'Ekwueme', 'Ojo', 'Ilesanmi', 'Onwuka',
+        'Adeniyi', 'Nzeribe', 'Fagbemi', 'Chiedu', 'Soyinka', 'Agbaje', 'Nwosuagwu', 'Odunlami',
+        'Ezenwa', 'Falana', 'Obialor', 'Shittu', 'Amadi', 'Ogunbiyi', 'Njoku', 'Adegoke', 'Iheanacho',
+        'Oyinlola', 'Achebe', 'Fawehinmi', 'Ogbonna', 'Akindele', 'Nweke', 'Olaniyan', 'Ihedioha',
+        'Sotomi', 'Anozie', 'Babangida', 'Umeh', 'Ademola', 'Chinwuba', 'Fasanya', 'Nwadike',
+        'Olatunbosun', 'Ezeani', 'Giwa', 'Onuoha', 'Adeoye', 'Mbah', 'Sulaimon', 'Okwuosa',
     ];
 
     /** Location tiers drive price, demand and days-on-market. */
@@ -115,13 +142,28 @@ final class Vocab
      * insight changes on screen — nothing is hardcoded in the UI.
      */
     public const NARRATIVES = [
+        /**
+         * Expressed as a SHARE of the open book, not a count.
+         *
+         * The stale detector compares the backlog against a baseline of 6% of
+         * open leads, so a fixed 47 stops being a finding the moment the book
+         * grows — which is exactly what happened when this dataset went from
+         * 1,400 leads to 4,500. A share keeps the condition true at any size.
+         */
         'STALE_LEADS' => [
-            'count' => 47, 'minDays' => 15, 'maxDays' => 41,
+            'openShare' => 0.19, 'minCount' => 40, 'minDays' => 15, 'maxDays' => 41,
             'detector' => 'stagnation', 'area' => 'leads',
             'note' => 'Open, high-budget leads with no contact activity for 15+ days.',
         ],
+        /**
+         * spendMult is relative to the AVERAGE campaign, and the detector
+         * ignores anything under 3.5% of total spend — correctly, because a
+         * campaign nobody is really funding is not a finding. Across ~120
+         * campaigns that means a burn has to be roughly six times the average
+         * before it deserves the word.
+         */
         'CAMPAIGN_BURN' => [
-            'name' => 'Meta - Lagos Mainland Push', 'spendMult' => 3.2, 'convMult' => 0.28,
+            'name' => 'Meta - Lagos Mainland Push', 'spendMult' => 7.5, 'convMult' => 0.28,
             'detector' => 'cohort', 'area' => 'marketing',
             'note' => 'Heavy spend, poor conversion versus the channel baseline.',
         ],
@@ -136,13 +178,24 @@ final class Vocab
             'detector' => 'threshold', 'area' => 'finance',
             'note' => 'Overdue instalments past 30 days, including one top-10 account.',
         ],
+        /**
+         * Also a share, for the same reason — and the detector will not call a
+         * theme a complaint unless at least 45% of the reviews carrying it are
+         * one or two stars. Organic reviews pick tags at random and are mostly
+         * positive, so at four times the review volume the planted cluster has
+         * to be both larger and angrier to survive the dilution.
+         */
         'FEEDBACK_CLUSTER' => [
-            'tag' => 'response time', 'count' => 23, 'windowDays' => 60,
+            'tag' => 'response time', 'windowShare' => 0.42, 'minCount' => 22,
+            'negativeWeights' => [46, 44, 10], 'windowDays' => 60,
             'detector' => 'anomaly', 'area' => 'feedback',
             'note' => 'Recurring complaint tag concentrated in the last 60 days.',
         ],
+        // Scaled with the team: 20 stars and 26 strugglers out of 120 keeps the
+        // same roughly one-in-five / one-in-four shape the cohort detector was
+        // tuned against, rather than two people carrying the whole signal.
         'AGENT_DIVERGENCE' => [
-            'stars' => 4, 'strugglers' => 5, 'starClose' => 0.62, 'strugglerClose' => 0.31,
+            'stars' => 20, 'strugglers' => 26, 'starClose' => 0.62, 'strugglerClose' => 0.31,
             'detector' => 'cohort', 'area' => 'sales',
             'note' => 'Two agent cohorts with materially different close rates on similar leads.',
         ],

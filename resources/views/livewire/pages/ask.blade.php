@@ -68,6 +68,21 @@
                             <p class="ask-answer__narrative">{!! Fmt::rich($a['narrative']) !!}</p>
                         @endif
 
+                        {{-- Only set when the question arrived from a finding.
+                             Same block, same styling as the card it came from,
+                             so the answer reads as a continuation of it. --}}
+                        @if ($a['todo'])
+                            <div class="finding__do">
+                                <span class="finding__do-k">What to do</span>
+                                <p class="finding__do-v">
+                                    <b>{{ $a['todo']['label'] }}</b>@if ($a['todo']['why']) — {{ $a['todo']['why'] }}@endif
+                                    @if ($a['todo']['impact'])
+                                        Worth roughly <b>{{ $a['todo']['impact'] }}</b> if it works.
+                                    @endif
+                                </p>
+                            </div>
+                        @endif
+
                         @if ($a['chart'])
                             <x-chart :kind="$a['chart']['kind']" :payload="$a['chart']['payload']" />
                         @endif

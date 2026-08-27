@@ -25,33 +25,84 @@ use Tests\TestCase;
  */
 class MailTest extends TestCase
 {
-    public function test_a_new_agency_gets_a_welcome(): void
+    /** The fields a registration now carries, minus the referral code. */
+    private function registration(array $overrides = []): array
+    {
+        return array_merge([
+            'name' => 'Ifeoma Nwachukwu',
+            'email' => 'ifeoma@harbour.test',
+            'phone' => '08031234567',
+            'state' => 'Lagos',
+            'lga' => 'Eti-Osa',
+            'income_bracket' => '10m-25m',
+            'occupation' => 'business-owner',
+            'heard_about_us' => 'instagram',
+            'password' => 'a-long-enough-password',
+            'password_confirmation' => 'a-long-enough-password',
+        ], $overrides);
+    }
+
+    public function test_a_new_investor_gets_a_welcome(): void
     {
         Mail::fake();
 
-        $this->post('/register', [
-            'agency' => 'Harbour Estates',
-            'name' => 'Ifeoma Nwachukwu',
-            'email' => 'ifeoma@harbour.test',
-            'password' => 'a-long-enough-password',
-            'password_confirmation' => 'a-long-enough-password',
-        ])->assertRedirect(route('app.settings'));
+        $this->post('/register', $this->registration())
+            ->assertRedirect(route('portal.browse'));
 
-        Mail::assertSent(AgencyWelcome::class, fn ($m) => $m->hasTo('ifeoma@harbour.test'));
+        Mail::assertSent(\App\Mail\InvestorWelcome::class,
+            fn ($m) => $m->hasTo('ifeoma@harbour.test'));
     }
 
-    public function test_a_buyer_cannot_sign_themselves_up(): void
+    public function test_a_registration_through_a_realtors_link_names_them(): void
     {
-        // A client account with no customer record behind it can see nothing.
-        // Refusing is more useful than creating one and letting them find out.
-        $this->post('/register', [
-            'kind' => 'client',
-            'name' => 'Someone', 'email' => 'buyer@harbour.test',
-            'password' => 'a-long-enough-password',
-            'password_confirmation' => 'a-long-enough-password',
-        ])->assertSessionHasErrors('email');
+        Mail::fake();
 
-        $this->assertNull(User::where('email', 'buyer@harbour.test')->first());
+        $realtor = \App\Models\Agent::query()->first();
+        $realtor->forceFill(['status' => 'approved', 'code' => 'WELC01'])->save();
+
+        $this->post('/register', $this->registration(['ref' => 'WELC01']))
+            ->assertRedirect(route('portal.browse'));
+
+        // The welcome says who is looking after them. An investor who
+        // registered through a link already believes somebody is.
+        Mail::assertSent(\App\Mail\InvestorWelcome::class,
+            fn ($m) => $m->realtor?->id === $realtor->id);
+
+        $this->assertSame(
+            $realtor->id,
+            \App\Models\Customer::where('email', 'ifeoma@harbour.test')->first()?->agent_id,
+        );
+    }
+
+    public function test_an_unknown_code_still_registers_them_unassigned(): void
+    {
+        Mail::fake();
+
+        // Somebody mistyping a code they were given must not be blocked at the
+        // last step of a form — they land in the unassigned queue instead.
+        $this->post('/register', $this->registration(['ref' => 'NOTREAL']))
+            ->assertRedirect(route('portal.browse'));
+
+        $investor = \App\Models\Customer::where('email', 'ifeoma@harbour.test')->first();
+
+        $this->assertNotNull($investor);
+        $this->assertNull($investor->agent_id, 'They belong in the unassigned queue.');
+    }
+
+    public function test_an_approved_realtor_is_emailed_their_code(): void
+    {
+        Mail::fake();
+
+        $realtor = \App\Models\Agent::query()->skip(3)->first();
+        $realtor->forceFill(['status' => 'pending', 'code' => null])->save();
+
+        app(\App\Platform\Realtors::class)->approve($realtor, $this->staff());
+
+        // The code and the link are the whole reason they have been waiting,
+        // so the email carries them rather than saying "sign in to find out".
+        Mail::assertSent(\App\Mail\RealtorApproved::class, function ($m) use ($realtor) {
+            return $m->hasTo($realtor->email) && filled($m->realtor->code);
+        });
     }
 
     public function test_raising_a_ticket_emails_both_sides(): void
@@ -102,7 +153,10 @@ class MailTest extends TestCase
         // the mailbox cannot disagree.
         $this->assertStringContainsString('sent', $result['detail']);
 
-        Mail::assertSent(PaymentReminder::class);
+        // Queued, not sent: a sweep of hundreds must not block the click that
+        // started it. With QUEUE_CONNECTION=sync this still leaves immediately.
+        Mail::assertQueued(PaymentReminder::class);
+        Mail::assertNotSent(PaymentReminder::class);
     }
 
     public function test_a_reminder_is_one_email_per_customer_not_per_instalment(): void
@@ -118,7 +172,7 @@ class MailTest extends TestCase
 
         $recipients = [];
 
-        Mail::assertSent(PaymentReminder::class, function ($mail) use (&$recipients) {
+        Mail::assertQueued(PaymentReminder::class, function ($mail) use (&$recipients) {
             $recipients[] = $mail->customer->id;
 
             return true;
@@ -145,6 +199,22 @@ class MailTest extends TestCase
         );
 
         $this->assertTrue($result['ok'], $result['message']);
+    }
+
+    public function test_the_paths_a_user_waits_on_still_send_inline(): void
+    {
+        Mail::fake();
+
+        // A ticket is one message on a click. Queueing it would mean the buyer
+        // is told it was sent before anything left, and the agent's inbox lags
+        // behind the portal.
+        Livewire::actingAs($this->client())
+            ->test(\App\Livewire\Portal\Support::class)
+            ->set('body', 'Checking that this reaches my agent straight away.')
+            ->call('send');
+
+        Mail::assertSent(SupportTicketRaised::class);
+        Mail::assertSent(SupportTicketReceived::class);
     }
 
     public function test_a_reset_link_is_branded_and_works(): void
@@ -197,11 +267,11 @@ class MailTest extends TestCase
         // arrives every morning regardless is a digest people filter away.
         \App\Models\Insight::query()->update(['dismissed_at' => now()]);
         $this->artisan('nexabi:digest')->assertSuccessful();
-        Mail::assertNothingSent();
+        Mail::assertNothingQueued();
 
         \App\Models\Insight::query()->update(['dismissed_at' => null]);
         $this->artisan('nexabi:digest')->assertSuccessful();
-        Mail::assertSent(\App\Mail\FindingsDigest::class);
+        Mail::assertQueued(\App\Mail\FindingsDigest::class);
     }
 
     public function test_the_digest_is_ranked_for_each_recipients_seat(): void
@@ -212,7 +282,7 @@ class MailTest extends TestCase
 
         $orders = [];
 
-        Mail::assertSent(\App\Mail\FindingsDigest::class, function ($mail) use (&$orders) {
+        Mail::assertQueued(\App\Mail\FindingsDigest::class, function ($mail) use (&$orders) {
             $orders[$mail->user->role] = collect($mail->insights)->pluck('id')->all();
 
             return true;

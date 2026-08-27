@@ -33,12 +33,16 @@ class Nav extends Component
 
         ['group' => 'Business'],
         ['route' => 'app.sales', 'label' => 'Sales', 'ico' => 'sales'],
+        ['route' => 'app.commitments', 'label' => 'Commitments', 'ico' => 'check', 'badge' => 'pending'],
         ['route' => 'app.leads', 'label' => 'Leads', 'ico' => 'leads', 'badge' => 'stale'],
         ['route' => 'app.properties', 'label' => 'Properties', 'ico' => 'property'],
         ['route' => 'app.marketing', 'label' => 'Marketing', 'ico' => 'marketing'],
-        ['route' => 'app.customers', 'label' => 'Customers', 'ico' => 'customers'],
+        ['route' => 'app.customers', 'label' => 'Investors', 'ico' => 'customers', 'badge' => 'unassigned'],
         ['route' => 'app.finance', 'label' => 'Finance', 'ico' => 'finance', 'badge' => 'overdue'],
-        ['route' => 'app.feedback', 'label' => 'Feedback', 'ico' => 'feedback'],
+
+        ['group' => 'People'],
+        ['route' => 'app.realtors', 'label' => 'Realtors', 'ico' => 'agent', 'badge' => 'realtors'],
+        ['route' => 'app.materials', 'label' => 'Materials', 'ico' => 'doc'],
 
         ['group' => 'Company'],
         ['route' => 'app.analytics', 'label' => 'Analytics', 'ico' => 'analytics'],
@@ -60,6 +64,10 @@ class Nav extends Component
             'insights' => ['n' => $counts['total'], 'cls' => 'is-ai'],
             'stale' => ['n' => $this->metrics()->leads()['stale'], 'cls' => 'is-alert'],
             'overdue' => ['n' => $this->metrics()->finance()['overdueCount'], 'cls' => 'is-alert'],
+            // The two queues that block somebody else s work.
+            'pending' => ['n' => \App\Models\Deal::where('status', 'pending')->count(), 'cls' => 'is-alert'],
+            'realtors' => ['n' => \App\Models\Agent::query()->pending()->count(), 'cls' => 'is-alert'],
+            'unassigned' => ['n' => \App\Models\Customer::query()->unassigned()->count(), 'cls' => ''],
         ];
 
         // Only shout when it is worth shouting about. A red "3" beside Leads

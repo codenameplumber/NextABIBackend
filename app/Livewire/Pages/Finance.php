@@ -3,7 +3,10 @@
 namespace App\Livewire\Pages;
 
 use App\Livewire\Concerns\InteractsWithEngine;
+use App\Models\CommissionPayout;
+use App\Models\Deal;
 use App\Models\Payment;
+use App\Platform\Instalments;
 use App\Support\Fmt;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
@@ -42,6 +45,9 @@ class Finance extends Component
     #[Url(except: '')] public string $q = '';
     #[Url(except: '')] public string $status = '';
     #[Url(except: '')] public string $filter = '';       // overdue
+
+    /** Transfer reference typed against a row, keyed by instalment id. */
+    public array $reference = [];
 
     public function mount(): void
     {
@@ -106,6 +112,87 @@ class Finance extends Component
         );
     }
 
+    /* ------------------------------------------------- recording payments */
+
+    /**
+     * Record an instalment against an offline transfer.
+     *
+     * This is how money actually arrives: a buyer pays into the account and
+     * somebody keys it in. The reference is asked for rather than optional,
+     * because a disputed payment with no reference is a conversation nobody
+     * can win.
+     */
+    public function recordPayment(int $paymentId): void
+    {
+        $reference = trim($this->reference[$paymentId] ?? "");
+
+        if ($reference === "") {
+            $this->toast("Reference needed", "Enter the transfer reference so this can be traced.");
+
+            return;
+        }
+
+        $result = app(Instalments::class)->record(
+            Payment::findOrFail($paymentId),
+            auth()->user(),
+            $reference,
+        );
+
+        $this->toast(
+            $result["ok"] ? "Recorded" : "Not recorded",
+            $result["message"],
+            $result["ok"] ? "pos" : "neg",
+        );
+
+        if ($result["ok"]) {
+            unset($this->reference[$paymentId]);
+            $this->metrics()->flush();
+            $this->dispatch("engine-changed");
+        }
+    }
+
+    public function reversePayment(int $paymentId): void
+    {
+        $result = app(Instalments::class)->reverse(
+            Payment::findOrFail($paymentId),
+            auth()->user(),
+        );
+
+        $this->toast($result["ok"] ? "Reversed" : "Nothing to reverse", $result["message"]);
+
+        if ($result["ok"]) {
+            $this->metrics()->flush();
+            $this->dispatch("engine-changed");
+        }
+    }
+
+    /**
+     * Pay a realtor what they are owed.
+     *
+     * Marks the accrual settled — it does not move money, which is done in a
+     * bank. Recording it here is what lets Finance answer "paid" as distinct
+     * from "owed" instead of treating an obligation as a transaction.
+     */
+    public function payCommission(int $payoutId): void
+    {
+        $payout = CommissionPayout::findOrFail($payoutId);
+
+        if ($payout->isPaid()) {
+            $this->toast("Already paid", "That payout was settled on "
+                .Fmt::dateShort($payout->paid_at).".");
+
+            return;
+        }
+
+        $payout->forceFill([
+            "status" => "paid",
+            "paid_at" => now(),
+            "recorded_by" => auth()->id(),
+        ])->save();
+
+        $this->toast("Commission paid", Fmt::money($payout->amount)
+            ." to ".($payout->realtor?->name ?? "realtor"), "pos");
+    }
     private function run(string $type, array $payload, string $label, string $key): void
     {
         $result = $this->bus()->manual(
@@ -151,6 +238,14 @@ class Finance extends Component
 
         $agingTotal = array_sum($f['aging']) ?: 1;
 
+        // Commission, split into what is owed and what has been paid. An
+        // obligation and a transaction are different things, and one column
+        // cannot honestly be both.
+        $payouts = CommissionPayout::with(['realtor:id,name,code', 'commitment.property:id,title,ref'])
+            ->orderByRaw("FIELD(status, 'owed', 'paid')")
+            ->orderByDesc('created_at')
+            ->limit(40)->get();
+
         return view('livewire.pages.finance', [
             'f' => $f,
             'rows' => $rows,
@@ -163,6 +258,15 @@ class Finance extends Component
             ],
             'hasVip' => collect($f['byCustomer'])
                 ->contains(fn ($c) => in_array($c['segment'], ['vip', 'high_value'], true)),
+
+            'payouts' => $payouts,
+            'commissionOwed' => (float) CommissionPayout::where('status', 'owed')->sum('amount'),
+            'commissionPaid' => (float) CommissionPayout::where('status', 'paid')->sum('amount'),
+
+            // Total assets sold, which is the figure this screen is asked for
+            // first and could not previously answer.
+            'assetsSold' => (int) Deal::whereIn('status', array_merge(Deal::LIVE, ['completed']))->count(),
+            'assetsSoldValue' => (float) Deal::whereIn('status', array_merge(Deal::LIVE, ['completed']))->sum('value'),
         ]);
     }
 }

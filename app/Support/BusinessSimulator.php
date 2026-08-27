@@ -22,6 +22,20 @@ class BusinessSimulator
     private const HISTORY_DAYS = 610;
     private const DAY = 86400;
 
+    /**
+     * Volume.
+     *
+     * Sized as a mid-market Lagos agency at roughly 20 months of trading:
+     * about seven leads a day against a 120-person sales floor and a 700-unit
+     * book. Every downstream count (deals, customers, payments, feedback,
+     * activity) falls out of these rather than being set independently, so the
+     * ratios stay believable when the dials move.
+     */
+    private const AGENTS = 120;
+    private const PROPERTIES = 700;
+    private const LEADS = 4500;
+    private const CAMPAIGNS_PER_MONTH = [4, 8];
+
     private Rng $r;
     private int $now;
     private int $start;
@@ -67,7 +81,11 @@ class BusinessSimulator
             }
         }
 
-        return $this->r->pick(Vocab::FIRST).' '.$this->r->pick(Vocab::LAST).' '.$this->r->int(2, 9);
+        // Out of unused combinations: a middle initial still reads as a
+        // person's name, where "Chidi Okafor 7" reads as a generated row.
+        return $this->r->pick(Vocab::FIRST).' '
+            .chr($this->r->int(65, 90)).'. '
+            .$this->r->pick(Vocab::LAST);
     }
 
     private function ts(int $unix): string
@@ -87,7 +105,7 @@ class BusinessSimulator
         $n = Vocab::NARRATIVES['AGENT_DIVERGENCE'];
         $out = [];
 
-        for ($i = 0; $i < 18; $i++) {
+        for ($i = 0; $i < self::AGENTS; $i++) {
             // Cohorts are planted: 4 stars, 5 strugglers, the rest core.
             $tier = $i < $n['stars'] ? 'star'
                 : ($i < $n['stars'] + $n['strugglers'] ? 'struggling' : 'core');
@@ -107,7 +125,9 @@ class BusinessSimulator
                 // Agents are people who receive things — a buyer's support
                 // ticket is addressed to their own agent, not to a shared box.
                 'email' => str($name)->slug('.').'@'.$this->tenant->slug.'.ng',
-                'role' => $i === 0 ? 'Head of Sales' : ($i < 4 ? 'Senior Agent' : 'Sales Agent'),
+                'role' => $i === 0 ? 'Head of Sales'
+                    : ($i < 6 ? 'Sales Manager'
+                        : ($i < 30 ? 'Senior Agent' : 'Sales Agent')),
                 'team' => $this->r->pick(['Island', 'Mainland', 'Luxury', 'Investment']),
                 'tier' => $tier,
                 'skill' => round($skill, 3),
@@ -137,16 +157,19 @@ class BusinessSimulator
 
         $idx = 0;
         for ($m = $monthStart->copy(); $m->lte($end); $m->addMonth()) {
-            $perMonth = $this->r->int(1, 3);
+            $perMonth = $this->r->int(...self::CAMPAIGNS_PER_MONTH);
             for ($k = 0; $k < $perMonth; $k++) {
                 $src = $this->r->fromTable(array_map(fn ($s) => ['v' => $s, 'w' => $s['w']], $paidSources));
                 $loc = $this->r->fromTable(array_map(fn ($l) => ['v' => $l, 'w' => $l['w']], Vocab::LOCATIONS));
 
                 $startAt = $m->getTimestamp() + $this->r->int(0, 6) * self::DAY;
                 $duration = $this->r->int(21, 62);
-                // Sized so total paid spend lands near 1.5% of revenue and
-                // blended ROAS sits in the 2-3x band.
-                $spend = round($this->r->logNormal(7200000, 0.5) / 100000) * 100000;
+                // Sized against COMMISSION, which is what the spend has to earn
+                // back. At the old figure the average campaign cost ~13.6M to
+                // win a customer worth ~7.4M in commission — a paid operation
+                // losing money on every acquisition. This lands acquisition
+                // cost near 40% of the commission it brings in.
+                $spend = round($this->r->logNormal(1900000, 0.5) / 100000) * 100000;
                 $impressions = (int) round($spend * $this->r->float(2.2, 4.6));
 
                 $out[] = [
@@ -208,7 +231,7 @@ class BusinessSimulator
         $out = [];
         $gap = Vocab::NARRATIVES['DEMAND_GAP'];
 
-        for ($i = 0; $i < 224; $i++) {
+        for ($i = 0; $i < self::PROPERTIES; $i++) {
             $loc = $this->r->fromTable(array_map(fn ($l) => ['v' => $l, 'w' => $l['w']], Vocab::LOCATIONS));
             $type = $this->r->fromTable(array_map(fn ($t) => ['v' => $t, 'w' => $t['w']], Vocab::PROP_TYPES));
             $beds = $this->r->pick($type['beds']);
@@ -238,16 +261,25 @@ class BusinessSimulator
 
             $views = (int) round($this->r->logNormal(240 * $loc['demand'], 0.62));
 
+            $sqm = $beds ? $beds * $this->r->int(48, 86) : $this->r->int(300, 1400);
+
             $out[] = [
                 'idx' => $i,
                 'tenant_id' => $this->tenant->id,
                 'ref' => 'NX-'.(1000 + $i),
-                'title' => $beds ? $beds.'-Bedroom '.$type['name'] : $type['name'],
+                // A plot is sold on its size and its address; "Land" on its own
+                // is a category, not a listing. Commercial gets the same
+                // treatment for the same reason.
+                'title' => $beds
+                    ? $beds.'-Bedroom '.$type['name']
+                    : ($type['name'] === 'Land'
+                        ? number_format($sqm).' m² Plot at '.$loc['name']
+                        : $type['name'].' at '.$loc['name']),
                 'type' => $type['name'],
                 'location' => $loc['name'],
                 'tier' => $loc['tier'],
                 'bedrooms' => $beds,
-                'size_sqm' => $beds ? $beds * $this->r->int(48, 86) : $this->r->int(300, 1400),
+                'size_sqm' => $sqm,
                 'price' => $price,
                 'status' => $status,
                 'listed_at' => $this->ts($listedAt),
@@ -257,7 +289,26 @@ class BusinessSimulator
                 'days_on_market' => $soldAt ? (int) round(($soldAt - $listedAt) / self::DAY) : $ageDays,
                 'views' => $views,
                 'inquiries' => max(0, (int) round($views * $this->r->float(0.03, 0.09))),
-                'agent_idx' => $this->r->int(0, 17),
+                'agent_idx' => $this->r->int(0, self::AGENTS - 1),
+
+                /**
+                 * Commission and terms.
+                 *
+                 * Rates cluster where a Nigerian agency actually prices — three
+                 * to seven percent — with the occasional higher one on a unit
+                 * that needs pushing. Capped at 15% by the model whatever is
+                 * written here.
+                 *
+                 * Longer terms on dearer stock: nobody buys a 250M house over
+                 * three months, and offering it makes the picker look broken.
+                 */
+                'commission_rate' => $this->r->weighted(
+                    [0.030, 0.040, 0.050, 0.060, 0.075, 0.100],
+                    [14, 24, 28, 18, 11, 5],
+                ),
+                'min_duration_months' => $price > 120000000 ? 12 : ($price > 45000000 ? 6 : 3),
+                'max_duration_months' => $price > 120000000 ? 60 : ($price > 45000000 ? 36 : 24),
+                'listed' => true,
                 'planted' => null,
                 'created_at' => now(), 'updated_at' => now(),
             ];
@@ -307,7 +358,7 @@ class BusinessSimulator
         $out = [];
         $stages = Vocab::STAGES;
 
-        for ($i = 0; $i < 1420; $i++) {
+        for ($i = 0; $i < self::LEADS; $i++) {
             $createdAt = $this->r->between($this->start, $this->now - 2 * self::DAY);
             $season = Vocab::seasonality($createdAt);
 
@@ -317,7 +368,10 @@ class BusinessSimulator
             // Attach to a campaign that was live when the lead arrived.
             $live = array_values(array_filter($campaigns, fn ($c) => $createdAt >= $c['start_ts']
                 && $createdAt <= $c['end_ts'] && $c['source'] === $src['name']));
-            $campaignIdx = ($live && $this->r->chance(0.72)) ? $this->r->pick($live)['idx'] : null;
+            // Paid-heavy attribution. At ~120 campaigns a 72% rate left the median
+            // campaign with zero closes, which collapsed the marketing baseline to
+            // nothing and made every ROAS figure on the page meaningless.
+            $campaignIdx = ($live && $this->r->chance(0.94)) ? $this->r->pick($live)['idx'] : null;
 
             $loc = $this->r->fromTable(array_map(fn ($l) => ['v' => $l, 'w' => $l['w']], Vocab::LOCATIONS));
             $type = $this->r->fromTable(array_map(fn ($t) => ['v' => $t, 'w' => $t['w']], Vocab::PROP_TYPES));
@@ -419,13 +473,20 @@ class BusinessSimulator
     {
         $n = Vocab::NARRATIVES['STALE_LEADS'];
 
+        $open = count(array_filter($leads, fn ($l) => $l['is_open']));
+        $want = max($n['minCount'], (int) round($open * $n['openShare']));
+
         $candidates = array_keys(array_filter($leads, fn ($l) => $l['is_open']
             && $l['status'] !== 'new' && $l['budget'] > 80000000));
 
         usort($candidates, fn ($a, $b) => $leads[$b]['budget'] <=> $leads[$a]['budget']);
-        $candidates = array_slice($candidates, 0, 180);
 
-        foreach ($this->r->sample($candidates, $n['count']) as $k) {
+        // Draw from a pool comfortably larger than the sample, so the planted
+        // backlog is not simply "the N most expensive leads in the book".
+        $candidates = array_slice($candidates, 0, max(240, $want * 3));
+        $want = min($want, count($candidates));
+
+        foreach ($this->r->sample($candidates, $want) as $k) {
             $leads[$k]['last_contact_ts'] = $this->daysAgo($this->r->int($n['minDays'], $n['maxDays']));
             $leads[$k]['planted'] = 'STALE_LEADS';
             // Stale *and* valuable — that is the entire point.
@@ -617,7 +678,7 @@ class BusinessSimulator
                     'segment' => 'standard',
                     'satisfaction' => null,
                     'source' => $l['source'],
-                ];
+                ] + $this->demographics($l);
             }
 
             $ci = $byLead[$d['lead_idx']];
@@ -640,6 +701,47 @@ class BusinessSimulator
         $customers['_order'] = $order;
 
         return [$customers, $deals];
+    }
+
+    /**
+     * Where somebody lives, what they do, and how they found us.
+     *
+     * Weighted towards Lagos because that is where the stock is, but not
+     * exclusively — a dataset where every buyer lives in the same state makes
+     * the state field look decorative, and it is not: diaspora and out-of-state
+     * buyers are a real segment for Lagos property.
+     *
+     * The channel is drawn independently of the realtor, because they answer
+     * different questions. Somebody can hear a radio advert and still be signed
+     * up by a realtor.
+     */
+    private function demographics(array $lead): array
+    {
+        $state = $this->r->chance(0.62)
+            ? 'Lagos'
+            : $this->r->pick([
+                'Ogun', 'Rivers', 'Federal Capital Territory', 'Oyo', 'Delta',
+                'Anambra', 'Kano', 'Enugu', 'Edo', 'Kaduna',
+            ]);
+
+        $lgas = \App\Support\Nigeria::lgas($state);
+
+        return [
+            'state' => $state,
+            'lga' => $lgas ? $this->r->pick($lgas) : null,
+            'income_bracket' => $this->r->weighted(
+                array_keys(\App\Support\Nigeria::INCOME_BRACKETS),
+                [4, 12, 22, 26, 18, 12, 6],
+            ),
+            'occupation' => $this->r->weighted(
+                array_keys(\App\Support\Nigeria::OCCUPATIONS),
+                [20, 16, 8, 7, 6, 9, 10, 4, 7, 6, 3, 3, 7, 2, 2],
+            ),
+            'heard_about_us' => $this->r->weighted(
+                array_keys(\App\Support\Nigeria::REFERRAL_SOURCES),
+                [22, 18, 12, 9, 8, 4, 4, 3, 7, 3, 2, 1, 3, 2, 1, 1],
+            ),
+        ];
     }
 
     /* ----------------------------------------------------------- payments */
@@ -766,9 +868,18 @@ class BusinessSimulator
             fn ($t) => preg_match('/respon|callback|chase|picked up|dropped off|week/i', $t)));
 
         $keys = array_keys($customers);
-        for ($k = 0; $k < $n['count']; $k++) {
+
+        // Sized against the reviews that will actually land in the detector's
+        // 60-day window, so the cluster stays a cluster as volume grows.
+        $inWindow = count(array_filter(
+            $out,
+            fn ($f) => $f['created_ts'] >= $this->daysAgo($n['windowDays']),
+        ));
+        $want = max($n['minCount'], (int) round($inWindow * $n['windowShare']));
+
+        for ($k = 0; $k < $want; $k++) {
             $c = $customers[$this->r->pick($keys)];
-            $rating = $this->r->weighted([1, 2, 3], [34, 46, 20]);
+            $rating = $this->r->weighted([1, 2, 3], $n['negativeWeights']);
 
             $out[] = [
                 'tenant_id' => $this->tenant->id,

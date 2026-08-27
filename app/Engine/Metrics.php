@@ -442,13 +442,14 @@ class Metrics
 
             $dealAgg = DB::table('deals')->where('tenant_id', $this->t())
                 ->where('won', true)->whereNotNull('campaign_id')
-                ->selectRaw('campaign_id, COUNT(*) c, SUM(value) v')
+                ->selectRaw('campaign_id, COUNT(*) c, SUM(value) v, SUM(commission) k')
                 ->groupBy('campaign_id')->get()->keyBy('campaign_id');
 
             $rows = $campaigns->map(function ($c) use ($leadCounts, $dealAgg) {
                 $leads = (int) ($leadCounts[$c->id] ?? 0);
                 $won = (int) ($dealAgg[$c->id]->c ?? 0);
                 $revenue = (float) ($dealAgg[$c->id]->v ?? 0);
+                $commission = (float) ($dealAgg[$c->id]->k ?? 0);
                 $spend = (float) $c->spend;
 
                 return [
@@ -457,10 +458,22 @@ class Metrics
                     'impressions' => (int) $c->impressions, 'clicks' => (int) $c->clicks,
                     'startAt' => $c->start_at, 'leads' => $leads, 'won' => $won,
                     'revenue' => $revenue,
+                    'commission' => $commission,
                     'cpl' => Stats::safeDiv($spend, $leads),
                     'cac' => Stats::safeDiv($spend, $won),
                     'conversion' => Stats::safeDiv($won, $leads),
-                    'roas' => Stats::safeDiv($revenue, $spend),
+
+                    /**
+                     * Return measured on COMMISSION, not on the purchase price.
+                     *
+                     * An agency does not bank the value of the flat; it banks
+                     * three or four percent of it. Dividing gross property
+                     * value by ad spend produced a flattering 16x on a
+                     * campaign operation that was in fact returning 0.6x and
+                     * losing money on every customer it acquired.
+                     */
+                    'roas' => Stats::safeDiv($commission, $spend),
+                    'grossRoas' => Stats::safeDiv($revenue, $spend),
                     'ctr' => Stats::safeDiv((int) $c->clicks, (int) $c->impressions),
                 ];
             })->sortByDesc('spend')->values()->all();
@@ -469,32 +482,54 @@ class Metrics
             $leads = array_sum(array_column($rows, 'leads'));
             $won = array_sum(array_column($rows, 'won'));
             $revenue = array_sum(array_column($rows, 'revenue'));
+            $commission = array_sum(array_column($rows, 'commission'));
             $qualified = array_values(array_filter($rows, fn ($c) => $c['leads'] >= 10));
 
             $byChannel = [];
             foreach ($rows as $c) {
                 $k = $c['channel'];
-                $byChannel[$k] ??= ['key' => $k, 'spend' => 0.0, 'leads' => 0, 'won' => 0, 'revenue' => 0.0];
+                $byChannel[$k] ??= ['key' => $k, 'spend' => 0.0, 'leads' => 0, 'won' => 0,
+                    'revenue' => 0.0, 'commission' => 0.0];
                 $byChannel[$k]['spend'] += $c['spend'];
                 $byChannel[$k]['leads'] += $c['leads'];
                 $byChannel[$k]['won'] += $c['won'];
                 $byChannel[$k]['revenue'] += $c['revenue'];
+                $byChannel[$k]['commission'] += $c['commission'];
             }
             foreach ($byChannel as $k => $v) {
                 $byChannel[$k]['cpl'] = Stats::safeDiv($v['spend'], $v['leads']);
                 $byChannel[$k]['conversion'] = Stats::safeDiv($v['won'], $v['leads']);
-                $byChannel[$k]['roas'] = Stats::safeDiv($v['revenue'], $v['spend']);
+                $byChannel[$k]['roas'] = Stats::safeDiv($v['commission'], $v['spend']);
             }
             $byChannel = array_values($byChannel);
             usort($byChannel, fn ($a, $b) => $b['spend'] <=> $a['spend']);
 
             return [
                 'spend' => $spend, 'leads' => $leads, 'won' => $won, 'revenue' => $revenue,
+                'commission' => $commission,
                 'cpl' => Stats::safeDiv($spend, $leads),
                 'cac' => Stats::safeDiv($spend, $won),
-                'roas' => Stats::safeDiv($revenue, $spend),
+                'roas' => Stats::safeDiv($commission, $spend),
+                'grossRoas' => Stats::safeDiv($revenue, $spend),
                 'conversion' => Stats::safeDiv($won, $leads),
-                'baselineConversion' => Stats::median(array_column($qualified, 'conversion')),
+                /**
+                 * POOLED, not a median of per-campaign rates.
+                 *
+                 * A campaign carrying twenty-odd leads closes nought, one or
+                 * two — so across a hundred campaigns the median rate is
+                 * whatever the middle campaign happened to do, which at this
+                 * sample size is usually zero. That is not "our campaigns
+                 * convert at 0%"; it is an estimator collapsing under small
+                 * samples, and it took the whole marketing page down with it.
+                 *
+                 * Total closes over total leads is both stable and what a
+                 * marketer means when they say "our campaigns convert at X".
+                 */
+                'baselineConversion' => Stats::safeDiv($won, $leads),
+
+                // Cost per lead survives the median: spend and leads are both
+                // sizeable per campaign, so the middle campaign is a fair
+                // representative and the median resists one runaway budget.
                 'baselineCpl' => Stats::median(array_column($qualified, 'cpl')),
                 'campaigns' => $rows,
                 'active' => array_values(array_filter($rows, fn ($c) => $c['status'] === 'active')),

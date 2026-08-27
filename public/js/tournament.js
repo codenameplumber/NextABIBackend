@@ -49,7 +49,11 @@ const STEPS = [
         + 'ranked by severity, confidence, role weight and impact — so a dramatic finding drawn '
         + 'from twelve records will not outrank a certain one drawn from four hundred.',
     route: '/app/insights',
-    target: '.insight',
+    // .finding, not .insight — the card was rebuilt around what is happening,
+    // what it means and what to do, and the class went with it. A stale
+    // selector here does not error, it just spotlights nothing, which is the
+    // worst way for a guided walkthrough to fail.
+    target: '.finding',
   },
   {
     title: 'Every number is one click from its rows',

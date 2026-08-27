@@ -63,14 +63,17 @@ class SendDigest extends Command
                 $feed = $engine->feed($user->role ?? 'ceo', 8);
 
                 try {
-                    Mail::to($user->email)->send(new FindingsDigest(
+                    // The morning digest fans out across every tenant, so it
+                    // belongs on a worker rather than in the scheduler's own
+                    // process where one slow send blocks the rest.
+                    Mail::to($user->email)->queue((new FindingsDigest(
                         user: $user,
                         tenant: $tenant,
                         insights: $feed,
                         headline: $headline,
                         brief: $narrator->brief($headline, $feed),
                         impact: $engine->impactOnTable($feed),
-                    ));
+                    ))->onQueue('mail'));
                     $sent++;
                 } catch (\Throwable $e) {
                     $this->error("  {$user->email} — ".$e->getMessage());

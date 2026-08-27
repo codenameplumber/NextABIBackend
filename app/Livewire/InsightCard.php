@@ -33,15 +33,32 @@ class InsightCard extends Component
 
     public bool $compact = false;
 
+    /**
+     * Whether this card carries an executable action.
+     *
+     * Off by default, and that is the important half. On the business modules
+     * a finding is context for the table underneath it — someone reading the
+     * Leads screen wants to know their follow-up is slipping, not to be handed
+     * a button mid-scroll. Those cards say what is happening, what it means
+     * and what to do about it, then offer Ask NexABI for the detail.
+     *
+     * The Insights screen turns it on, because that is the one place a person
+     * arrived specifically to decide something. The closed loop is unchanged:
+     * the same ActionBus, the same before-and-after diff, the same finding
+     * retiring itself. It is reachable from one screen instead of six.
+     */
+    public bool $showActions = false;
+
     /** Set once an action retires the finding, so the card can bow out. */
     public bool $retired = false;
 
     public ?string $lastResult = null;
 
-    public function mount(Insight|int $insight, bool $compact = false): void
+    public function mount(Insight|int $insight, bool $compact = false, bool $showActions = false): void
     {
         $this->insightId = $insight instanceof Insight ? $insight->id : $insight;
         $this->compact = $compact;
+        $this->showActions = $showActions;
     }
 
     public function insight(): ?Insight
@@ -114,6 +131,17 @@ class InsightCard extends Component
         return view('livewire.insight-card', [
             'insight' => $insight,
             'narrative' => $insight ? $this->narrator()->narrate($insight) : '',
+            // The single thing to do about it, rendered as a sentence rather
+            // than a control. Its label and rationale were always written to
+            // be read — they were just buried under a button.
+            'todo' => $insight?->primaryRecommendation(),
+            // Carries the question AND the finding's id. The question is what
+            // the reader sees typed into the box; the id is what guarantees the
+            // answer is about this finding rather than whatever the router
+            // managed to make of the sentence.
+            'ask' => $insight
+                ? route('app.ask', ['q' => $insight->askQuestion(), 'from' => $insight->id])
+                : route('app.ask'),
         ]);
     }
 }

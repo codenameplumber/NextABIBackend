@@ -74,10 +74,18 @@ class Payments extends Component
 
     public function render()
     {
+        $portfolio = \App\Support\Purchase::portfolio($this->customer());
+
         return view('livewire.portal.payments', [
             'customer' => $this->customer(),
             'p' => $this->purchase(),
             'next' => $this->purchase()->next(),
+
+            // Everything else they hold. A portal that shows one purchase and
+            // silently hides the rest is worse than one that never let them
+            // buy twice — and browsing now actively encourages a second.
+            'others' => $portfolio->reject(fn ($x) => $x->deal?->id === $this->purchase()->deal?->id),
+            'awaiting' => \App\Support\Purchase::awaiting($this->customer()),
         ]);
     }
 }

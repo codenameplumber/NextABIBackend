@@ -3,7 +3,9 @@
 namespace App\Livewire\Pages;
 
 use App\Livewire\Concerns\InteractsWithEngine;
+use App\Models\Agent;
 use App\Models\Customer;
+use App\Platform\Realtors;
 use App\Support\Fmt;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
@@ -32,6 +34,9 @@ class Customers extends Component
     #[Url(except: 'desc')] public string $dir = 'desc';
 
     public ?int $openId = null;
+
+    /** Realtor picked in the inline assign control, keyed by investor. */
+    public array $assignTo = [];
 
     public function updated($property): void
     {
@@ -62,6 +67,46 @@ class Customers extends Component
         $this->resetPage();
     }
 
+    /**
+     * Attach a realtor to an investor who arrived without a code.
+     *
+     * The unassigned queue exists because somebody can find the platform on
+     * their own. Clearing it is what makes that investor's first commitment
+     * approvable — commission has to have an owner before a plan goes live.
+     */
+    public function assignRealtor(int $investorId): void
+    {
+        $realtorId = (int) ($this->assignTo[$investorId] ?? 0);
+
+        if (! $realtorId) {
+            $this->toast('Pick a realtor', 'Choose who should own this investor.');
+
+            return;
+        }
+
+        $result = app(Realtors::class)->assign(
+            Customer::findOrFail($investorId),
+            Agent::findOrFail($realtorId),
+            auth()->user(),
+        );
+
+        $this->toast(
+            $result['ok'] ? 'Assigned' : 'Nothing to do',
+            $result['message'],
+            $result['ok'] ? 'pos' : '',
+        );
+
+        if ($result['ok']) {
+            unset($this->assignTo[$investorId]);
+        }
+    }
+
+    public function toggleUnassigned(): void
+    {
+        $this->filter = $this->filter === 'unassigned' ? '' : 'unassigned';
+        $this->resetPage();
+    }
+
     public function open(int $id): void
     {
         $this->openId = $id;
@@ -88,6 +133,8 @@ class Customers extends Component
             ->when($this->segment, fn ($qq) => $qq->where('segment', $this->segment))
             ->when($this->filter === 'detractors', fn ($qq) => $qq
                 ->whereNotNull('satisfaction')->where('satisfaction', '<=', 2.5))
+            ->when($this->filter === 'unassigned', fn ($qq) => $qq->unassigned())
+            ->with('realtor:id,name,code')
             ->orderBy($this->sortColumn(), $this->dir)
             ->paginate(40);
 
@@ -101,6 +148,9 @@ class Customers extends Component
 
         return view('livewire.pages.customers', [
             'c' => $c,
+            // The queue an admin works through every morning.
+            'unassignedCount' => Customer::query()->unassigned()->count(),
+            'realtors' => Agent::query()->approved()->orderBy('name')->get(['id', 'name', 'code']),
             'rows' => $rows,
             'detail' => $detail,
             'overdue' => $detail

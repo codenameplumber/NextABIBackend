@@ -60,6 +60,12 @@ class Audit extends Command
             $this->auditParity();
         } finally {
             $this->option('keep') ? DB::commit() : DB::rollBack();
+
+            // The metric cache is a file store and is not transactional, so a
+            // rollback leaves it describing a world that was rolled away. An
+            // audit that poisons the app's figures for ten minutes is worse
+            // than no audit.
+            Metrics::for($tenant)->flush();
         }
 
         $this->report();
@@ -451,13 +457,27 @@ class Audit extends Command
             $this->missing('email', 'any Mailable or Notification', 'none exist in app/Mail or app/Notifications');
         }
 
-        $this->results[] = [
-            'area' => 'email', 'what' => 'MAIL_MAILER',
-            'status' => config('mail.default') === 'log' ? 'MISSING' : 'OK',
-            'note' => config('mail.default') === 'log'
-                ? 'set to "log" — nothing is delivered, mail is written to storage/logs'
-                : config('mail.default'),
-        ];
+        // Configured is not the same as working. SMTP with no credentials is
+        // the shape a Mailtrap setup takes ten seconds before it is finished,
+        // and it fails on the first send rather than at boot.
+        $mailer = config('mail.default');
+        $username = config('mail.mailers.smtp.username');
+        $host = config('mail.mailers.smtp.host');
+
+        $this->results[] = match (true) {
+            $mailer === 'log' => [
+                'area' => 'email', 'what' => 'transport', 'status' => 'MISSING',
+                'note' => 'MAIL_MAILER=log — written to storage/logs, not delivered',
+            ],
+            $mailer === 'smtp' && blank($username) => [
+                'area' => 'email', 'what' => 'transport', 'status' => 'MISSING',
+                'note' => $host.' set, but MAIL_USERNAME is blank — paste your Mailtrap credentials',
+            ],
+            default => [
+                'area' => 'email', 'what' => 'transport', 'status' => 'OK',
+                'note' => $mailer.' via '.$host,
+            ],
+        };
 
         // Every flow, actually rendered. A Mailable that exists and throws on
         // render is worse than one that does not exist.
@@ -511,20 +531,26 @@ class Audit extends Command
         });
 
         $this->check('email', 'reminders actually leave the action', function () use ($tenant) {
-            \Illuminate\Support\Facades\Mail::fake();
+            $fake = \Illuminate\Support\Facades\Mail::fake();
 
-            (new \App\Engine\ActionBus($tenant))->manual(
+            $result = (new \App\Engine\ActionBus($tenant))->manual(
                 'SEND_REMINDERS', ['filter' => 'overdue'],
                 'Audit reminders', 'audit:mail:'.uniqid(),
             );
 
-            $count = 0;
-            \Illuminate\Support\Facades\Mail::assertSent(
-                \App\Mail\PaymentReminder::class,
-                function () use (&$count) { $count++; return true; },
-            );
+            // Counted off the fake rather than asserted. PHPUnit's assertions
+            // need a Configuration singleton that only exists inside a test
+            // run, so a failing assertion here dies with an unrelated error
+            // instead of reporting what went wrong.
+            $queued = $fake->queued(\App\Mail\PaymentReminder::class)->count();
+            $sent = $fake->sent(\App\Mail\PaymentReminder::class)->count();
+            $total = $queued + $sent;
 
-            return $count.' reminder '.($count === 1 ? 'email' : 'emails').' queued';
+            $this->assert($result['ok'], 'the action itself refused: '.$result['message']);
+            $this->assert($total > 0, 'the action reported success and sent nothing');
+
+            return $total.' reminder '.($total === 1 ? 'email' : 'emails')
+                .' ('.$queued.' queued, '.$sent.' inline)';
         });
     }
 
@@ -539,13 +565,45 @@ class Audit extends Command
     private function auditParity(): void
     {
         $checks = [
+            ['ai', 'OpenAI narrator wired', 'app/Ai/OpenAiNarrator.php', 'api.openai.com'],
+            ['ai', 'key read from OPENAI_API_KEY', 'config/services.php', 'OPENAI_API_KEY'],
+            ['ai', 'falls back to the templated narrator', 'app/Ai/OpenAiNarrator.php', '$fallback()'],
             ['console shell', 'Time Machine (+7d / +30d)', 'app/Livewire/TimeMachine.php', 'advance'],
             ['console shell', 'Tournament Mode walkthrough', 'public/js/tournament.js', 'Tournament Mode'],
             ['console shell', 'palette arrow-key navigation', 'resources/views/livewire/palette.blade.php', 'ArrowDown'],
             ['console shell', 'palette action commands', 'app/Livewire/Palette.php', "'Actions'"],
-            ['auth', 'login: Agency vs Client picker', 'resources/views/auth/login.blade.php', 'Where are you going'],
-            ['auth', 'login: "Sign in as" seat selector', 'resources/views/auth/login.blade.php', 'Sign in as'],
-            ['auth', 'register: agency vs buyer picker', 'resources/views/auth/register.blade.php', 'role-pick'],
+            /*
+             | This used to assert that the login page carried one-click demo
+             | chips. It no longer does — a sign-in screen handing out six
+             | working logins reads as a demo rather than as a product, so they
+             | were removed and the accounts documented in the README instead.
+             |
+             | The check follows the information rather than being deleted. Its
+             | point was never the chips; it was that a reviewer can get in
+             | without reading source, and that is still worth failing over.
+             */
+            ['auth', 'demo accounts documented for reviewers', 'README.md', 'ada@anchorstone.ng'],
+            /*
+             | The seat selector was removed from the sign-in form — a lens is
+             | a preference, not a credential. The role switcher inside the
+             | console is where it lives now, and that is what this checks: the
+             | capability still has to exist, just not on the door.
+             */
+            ['auth', 'role switcher lives in the console', 'app/Http/Controllers/AuthController.php', 'switchRole'],
+            ['auth', 'register: state and local government', 'resources/views/auth/register.blade.php', 'lgaPicker'],
+            ['auth', 'register: where did you hear about us', 'resources/views/auth/register.blade.php', 'heard_about_us'],
+            ['auth', 'register: realtor referral code', 'resources/views/auth/register.blade.php', 'name="ref"'],
+            ['auth', 'realtor self-signup', 'resources/views/auth/realtor-apply.blade.php', 'realtor.apply.attempt'],
+
+            ['platform', 'referral codes are issued at approval', 'app/Platform/Realtors.php', 'generateCode'],
+            ['platform', 'approval requires an assigned realtor', 'app/Models/Deal.php', 'approvalBlocker'],
+            ['platform', 'commission rate frozen at approval', 'app/Platform/Commitments.php', 'commission_rate'],
+            ['platform', 'commission capped at 15%', 'app/Models/Property.php', 'MAX_COMMISSION_RATE'],
+            ['platform', 'investor chooses the term', 'app/Models/Property.php', 'durationOptions'],
+            ['platform', 'instalments recorded by an admin', 'app/Platform/Instalments.php', 'recorded_by'],
+            ['platform', 'milestone feedback triggers', 'app/Platform/Instalments.php', 'feedbackDue'],
+            ['platform', 'materials personalised per realtor', 'app/Models/PromotionalMaterial.php', 'personalise'],
+            ['platform', '774 local governments', 'app/Support/Nigeria.php', 'lgaCount'],
             ['auth', 'register: password strength meter', 'public/js/password-strength.js', 'Strong enough'],
             ['auth', 'forgot / reset password pages', 'resources/views/auth/reset-password.blade.php', 'Choose a new password'],
             ['portal', 'documents: "Download all"', 'app/Livewire/Portal/Documents.php', 'downloadAll'],

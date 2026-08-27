@@ -66,7 +66,11 @@
         <div class="feed">
             @foreach ($shown as $insight)
                 <div @if((string) $insight->id === $id) style="outline:2px solid var(--brand-500);outline-offset:2px;border-radius:var(--r-lg)" @endif>
-                    <livewire:insight-card :insight="$insight" :key="'feed-'.$insight->id" />
+                    {{-- The one screen that carries an executable action. You
+                         arrive here to decide something; everywhere else a
+                         finding is context for the table beneath it. --}}
+                    <livewire:insight-card :insight="$insight" :show-actions="true"
+                                           :key="'feed-'.$insight->id" />
                 </div>
             @endforeach
         </div>

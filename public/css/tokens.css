@@ -65,6 +65,35 @@
   --seq-1: #cde2fb; --seq-2: #9ec5f4; --seq-3: #6da7ec;
   --seq-4: #3987e5; --seq-5: #256abf; --seq-6: #184f95;
 
+
+  /* --- Property artwork ---------------------------------------------------
+     A dedicated palette, deliberately NOT the chart hues (those mean series)
+     and never the brand gold (that means the intelligence layer is speaking).
+     Nothing in a picture of a building should be mistakable for a status.
+
+     Used by App\Support\PropertyArt, which draws a different scene per sale
+     type. When real photographs exist they live in properties.images and are
+     preferred over any of this.                                            */
+  --art-sky-1:   #cfe0f2;   /* dawn, high */
+  --art-sky-2:   #eef2f4;   /* dawn, horizon */
+  --art-sky-3:   #b9cfe6;   /* day, high */
+  --art-sky-4:   #e6ecf0;   /* day, horizon */
+  --art-sun:     #f2c88a;
+  --art-far:     #a9b6c4;   /* distant skyline */
+  --art-ground:  #d8d6cd;
+  --art-face:    #f0ece4;   /* the lit face of a building */
+  --art-side:    #d4cec2;   /* the shaded return */
+  --art-roof:    #8d7f70;
+  --art-door:    #6f6152;
+  --art-glass:   #9db4c8;
+  --art-lit:     #f6dfae;   /* a window with someone in it */
+  --art-line:    #7d8894;
+  --art-leaf:    #6f9068;
+  --art-trunk:   #7d6a55;
+  --art-plot:    #cdd6c4;   /* surveyed ground */
+  --art-beacon:  #b6603c;   /* survey beacon */
+  --art-awning:  #b5776a;
+
   /* --- Geometry --------------------------------------------------------- */
   --r-xs: 4px;
   --r-sm: 6px;
@@ -188,6 +217,30 @@
   --c5: #d55181;
   --c6: #008300;
   --c-other: #898781;
+
+
+  /* Property artwork at night — selected, not an automatic darkening. The lit
+     windows get WARMER against a cold sky, which is what actually happens and
+     what stops a dark card reading as a switched-off one. */
+  --art-sky-1:   #1b2436;
+  --art-sky-2:   #2c3446;
+  --art-sky-3:   #141c2b;
+  --art-sky-4:   #26313f;
+  --art-sun:     #6f7fa0;
+  --art-far:     #222b3a;
+  --art-ground:  #1a1f27;
+  --art-face:    #2f3540;
+  --art-side:    #232833;
+  --art-roof:    #454b57;
+  --art-door:    #1d222b;
+  --art-glass:   #38475c;
+  --art-lit:     #e8c47a;
+  --art-line:    #5b6675;
+  --art-leaf:    #3f5a44;
+  --art-trunk:   #40372e;
+  --art-plot:    #232b26;
+  --art-beacon:  #8a4a30;
+  --art-awning:  #6d4740;
 
   --seq-1: #0d366b; --seq-2: #184f95; --seq-3: #256abf;
   --seq-4: #3987e5; --seq-5: #6da7ec; --seq-6: #9ec5f4;

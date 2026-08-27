@@ -104,26 +104,8 @@
 }
 @media (max-width: 720px) { .prop-card { grid-template-columns: minmax(0, 1fr); } }
 
-/* No stock photography — a generated architectural mark instead. Honest, and
-   it can never show the wrong building. */
-.prop-art {
-  position: relative;
-  min-height: 190px;
-  background:
-    linear-gradient(160deg, color-mix(in srgb, var(--brand-500) 22%, transparent), transparent 62%),
-    var(--surface-3);
-  display: grid; place-items: center;
-  border-right: 1px solid var(--border);
-}
-@media (max-width: 720px) { .prop-art { border-right: 0; border-bottom: 1px solid var(--border); } }
-.prop-art svg { width: 82px; height: 82px; color: var(--brand-500); opacity: .55; }
-.prop-art__ref {
-  position: absolute; left: var(--s-3); top: var(--s-3);
-  font-family: var(--mono); font-size: var(--t-xs);
-  padding: 3px 8px; border-radius: var(--r-sm);
-  background: color-mix(in srgb, var(--bg-deep) 55%, transparent);
-  color: var(--text-2);
-}
+/* .prop-art lives in components.css — every layout loads that one, and the
+   public pages do not load this file. */
 
 .prop-body { padding: var(--s-5); display: grid; gap: var(--s-4); align-content: start; }
 .prop-title { font-size: var(--t-xl); font-weight: 640; letter-spacing: -.02em; }
@@ -397,3 +379,39 @@
   padding-top: var(--s-4);
   border-top: 1px solid var(--border);
 }
+
+/* ====================  SPACING INSIDE THE PORTAL SHELL  ==================
+   .pt-main is a grid with a 20px gap, written for the sections of a page.
+
+   But its only real child is Livewire's component root, so the grid was
+   laying out ONE item and the gap reached nothing — every section on every
+   portal and realtor page was stacked flush against the next with no space
+   at all. The page-note then made it worse: it carries a negative top margin
+   tuned for the console, where a .stack gap absorbs it, so here it was pulled
+   INTO the banner above it.
+
+   Same fix as the sidebar: display:contents takes the wrapper out of the box
+   tree while leaving it in the DOM, so Livewire still finds its root to morph
+   and the grid sees the sections it was written for.
+   ========================================================================= */
+
+.pt-main > [wire\:id],
+.pt-main > [data-wire-id],
+.pt-main > div:only-child { display: contents; }
+
+/* With the gap doing the work, the console's negative pulls are no longer
+   correcting for anything — they are just collision. */
+.pt-main .page-note { margin-top: 0; }
+.pt-note { margin-bottom: 0; }
+
+/* A buyer reads this top to bottom rather than scanning it, so it gets more
+   room than the console's equivalent. */
+.pt-main .page-note {
+  padding: var(--s-4) var(--s-5);
+  line-height: 1.65;
+  max-width: 78ch;
+}
+
+/* A page that groups its own content keeps its rhythm rather than inheriting
+   the shell's — the sections inside it are a set, not siblings of the rest. */
+.pt-main > .stack { display: grid; gap: var(--s-6); }

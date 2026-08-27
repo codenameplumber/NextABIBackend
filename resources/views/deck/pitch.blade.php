@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="{{ asset('css/base.css') }}">
 <link rel="stylesheet" href="{{ asset('css/deck.css') }}">
 
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%230A0A0B'/><path d='M28 72V28h11l22 30V28h11v44H61L39 42v30z' fill='%23E0A82E'/></svg>">
+<link rel="icon" type="image/png" href="{{ asset('img/icons.png') }}">
 </head>
 <body class="deck">
 
@@ -24,15 +24,10 @@
 <!-- ═══ 01 — Cover ═══════════════════════════════════════════════════ -->
 <section class="slide slide--glow">
   <div class="s-center">
-    <div style="display:flex;align-items:center;gap:14px;margin-bottom:52px">
-      <span style="width:52px;height:52px;border-radius:15px;background:var(--brand-500);display:grid;place-items:center">
-        <svg viewBox="0 0 100 100" width="30" height="30"><path d="M28 72V28h11l22 30V28h11v44H61L39 42v30z" fill="#171614"/></svg>
-      </span>
-      <div>
-        <div style="font-size:30px;font-weight:660;letter-spacing:-.035em;line-height:1">NexABI</div>
-        <div style="font-size:11px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--text-3);margin-top:5px">Adaptive Business Intelligence</div>
-      </div>
-    </div>
+    {{-- The deck is dark, which is exactly what this lockup was drawn for. --}}
+    <img src="{{ asset('img/logo.png') }}" width="286" height="116"
+         alt="NexABI — Adaptive Business Intelligence"
+         style="display:block;height:auto;width:286px;margin-bottom:52px">
 
     <h1 class="s-title" style="font-size:58px;max-width:19ch">
       Estate agencies lose money in ways they cannot see.
@@ -687,15 +682,9 @@
       <div class="s-fig"><div class="n">45</div><div class="k">Customers to break even</div></div>
     </div>
 
-    <div style="display:flex;align-items:center;gap:12px;margin-top:46px">
-      <span style="width:34px;height:34px;border-radius:10px;background:var(--brand-500);display:grid;place-items:center">
-        <svg viewBox="0 0 100 100" width="20" height="20"><path d="M28 72V28h11l22 30V28h11v44H61L39 42v30z" fill="#171614"/></svg>
-      </span>
-      <div>
-        <div style="font-size:19px;font-weight:650;letter-spacing:-.03em;line-height:1.1">NexABI</div>
-        <div style="font-size:10px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--text-3);margin-top:3px">Adaptive Business Intelligence</div>
-      </div>
-    </div>
+    <img src="{{ asset('img/logo.png') }}" width="190" height="77"
+         alt="NexABI — Adaptive Business Intelligence"
+         style="display:block;height:auto;width:190px;margin-bottom:44px">
   </div>
   <div class="slide__num">16</div>
 </section>

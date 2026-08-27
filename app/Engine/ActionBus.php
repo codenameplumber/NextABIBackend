@@ -132,14 +132,33 @@ class ActionBus
             return $result;
         });
 
-        if ($result['ok']) {
+        $this->settle($result['ok'], $type);
+
+        return $result;
+    }
+
+    /**
+     * Discard the metric cache once the transaction has resolved.
+     *
+     * The cache is a file store; it is not transactional. Handlers call
+     * metrics() to measure the before/after diff, which repopulates the cache
+     * from *uncommitted* state — so a rollback leaves figures describing a
+     * world that no longer exists, and the app keeps serving them until they
+     * expire ten minutes later.
+     *
+     * Flushing on both paths is right in both directions: after a commit the
+     * cache is stale anyway, and after a rollback it is wrong.
+     */
+    private function settle(bool $ok, string $type): void
+    {
+        $this->metrics()->flush();
+
+        if ($ok) {
             // Re-run only what this action can have changed. Small scope, so
             // it is fast enough to do inside the request and the user sees the
             // finding retire itself.
             InsightEngine::for($this->tenant)->run(self::INVALIDATES[$type] ?: null);
         }
-
-        return $result;
     }
 
     /**
@@ -201,9 +220,7 @@ class ActionBus
             return $result;
         });
 
-        if ($result['ok']) {
-            InsightEngine::for($this->tenant)->run(self::INVALIDATES[$type] ?: null);
-        }
+        $this->settle($result['ok'], $type);
 
         return $result;
     }
@@ -672,9 +689,13 @@ class ActionBus
             }
 
             try {
-                Mail::to($customer->email)->send(
-                    new PaymentReminder($customer, $payments->values()),
-                );
+                // Dispatched, not sent. A sweep across the whole book is
+                // hundreds of messages, and a user should not sit through SMTP
+                // round trips to find out their action worked. With
+                // QUEUE_CONNECTION=sync this still goes out inline, so local
+                // testing behaves exactly as it reads.
+                Mail::to($customer->email)
+                    ->queue((new PaymentReminder($customer, $payments->values()))->onQueue('mail'));
                 $sent++;
             } catch (\Throwable $e) {
                 report($e);

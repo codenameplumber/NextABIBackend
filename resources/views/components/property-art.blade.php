@@ -1,26 +1,56 @@
-@props(['property' => null])
+@props(['property' => null, 'eager' => false])
 @php
+    use App\Support\PropertyArt;
+    use App\Support\PropertyPhotos;
+
     /**
-     * Building mark for the property card — generated, never a stock photo.
+     * The picture on a property card. Three sources, in order of truth.
      *
-     * A real-estate product that ships with someone else's photographs of
-     * someone else's buildings is lying about what it knows. The glyph varies
-     * with the unit's size, so a studio and a five-bed do not wear the same
-     * picture.
+     *   1. properties.images  — the agency's own photograph of the actual unit
+     *   2. PropertyPhotos     — a real photograph matched to the sale type
+     *   3. PropertyArt        — a drawing, when there is no photograph at all
+     *
+     * The drawing stays because it is the only one of the three that can never
+     * show the wrong building, and it is what a fresh install falls back to.
      */
-    $beds = $property?->bedrooms ?? 0;
-    $glyph = $beds >= 4
-        ? 'M3 21V8l9-5 9 5v13M3 21h18M9 21v-6h6v6M7 11h2M15 11h2M7 15h2'
-        : ($beds > 0
-            ? 'M4 21V9l8-5 8 5v12M4 21h16M9 21v-5h6v5M8 12h2M14 12h2'
-            : 'M4 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18M16 8h3a2 2 0 0 1 2 2v12M8 6h2M8 10h2M8 14h2M8 18h2');
+    $art = PropertyArt::for($property);
+
+    // The agency's own image may be a link it hosts elsewhere or a file
+    // uploaded into public/. resolve() takes either and returns something a
+    // browser can actually load from any URL on the site.
+    $own = collect($property?->images ?? [])
+        ->map(fn ($i) => PropertyPhotos::resolve(is_string($i) ? $i : ($i['path'] ?? null)))
+        ->filter()
+        ->first();
+
+    $photo = $own ?: PropertyPhotos::for($property);
+    $label = trim(($property?->bedrooms ? $property->bedrooms.'-bed ' : '').($property?->type ?? 'Property'));
+    $where = $property?->location ? ' in '.$property->location : '';
 @endphp
-<div class="prop-art">
-    @if ($property?->ref)<span class="prop-art__ref">{{ $property->ref }}</span>@endif
-    <span>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"
-             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="{{ $glyph }}"/>
+
+<div class="prop-art prop-art--{{ $art->scene() }}">
+    @if ($photo)
+        <img src="{{ $photo }}" alt="{{ $label }}{{ $where }}"
+             class="prop-art__photo"
+             loading="{{ $eager ? 'eager' : 'lazy' }}"
+             decoding="{{ $eager ? 'sync' : 'async' }}">
+    @else
+        <svg viewBox="0 0 400 250" preserveAspectRatio="xMidYMax slice"
+             role="img" aria-label="{{ $label }}{{ $where }}"
+             class="prop-art__svg">
+            {!! $art->svg() !!}
         </svg>
-    </span>
+    @endif
+
+    {{-- A scrim under the chips. Without it a white caption lands on a bright
+         sky and a dark one lands on a shadow, and neither is readable. --}}
+    <span class="prop-art__scrim" aria-hidden="true"></span>
+
+    @if ($property?->ref)
+        <span class="prop-art__ref">{{ $property->ref }}</span>
+    @endif
+
+    @if ($property?->type)
+        <span class="prop-art__type">{{ $property->type }}</span>
+    @endif
 </div>

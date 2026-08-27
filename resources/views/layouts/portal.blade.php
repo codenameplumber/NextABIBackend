@@ -1,12 +1,13 @@
 @php
     // Theme is stamped before any CSS parses — a flash of the wrong background
     // on a page about someone's money reads as a broken product.
-    $theme = request()->cookie('nexabi_theme', 'dark');
+    $theme = request()->cookie('nexabi_theme', 'light');
     $customer = App\Models\Customer::find(auth()->user()->customer_id);
     $late = App\Support\Purchase::for($customer)->lateCount();
+    $myRealtor = $customer?->realtor;
 @endphp
 <!DOCTYPE html>
-<html lang="en" data-theme="{{ $theme === 'light' ? 'light' : 'dark' }}">
+<html lang="en" data-theme="{{ $theme === 'dark' ? 'dark' : 'light' }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -20,7 +21,8 @@
     <link rel="stylesheet" href="{{ asset('css/editorial.css') }}">
     <link rel="stylesheet" href="{{ asset('css/portal.css') }}">
     <link rel="stylesheet" href="{{ asset('css/console.css') }}">
-    <link rel="icon" href="{{ asset('favicon.ico') }}">
+    <link rel="icon" type="image/png" href="{{ asset('img/icons.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('img/icons.png') }}">
 
     @livewireStyles
 </head>
@@ -29,11 +31,7 @@
 <header class="pt-head">
     <div class="pt-head__top">
         <a class="brand" href="{{ route('home') }}">
-            <span class="brand-mark">
-                <svg viewBox="0 0 100 100" width="18" height="18" aria-hidden="true">
-                    <path d="M28 72V28h11l22 30V28h11v44H61L39 42v30z" fill="currentColor"/>
-                </svg>
-            </span>
+            <x-logo variant="mark" :height="30" />
             <span class="brand-text">
                 <span class="brand-name">NexABI</span>
                 <span class="brand-tag">Client portal</span>
@@ -63,6 +61,8 @@
     <nav class="pt-nav">
         @foreach ([
             ['portal.overview', 'My property', 'property'],
+            ['portal.browse', 'Browse', 'search'],
+            ['portal.ask', 'Ask NexABI', 'ask'],
             ['portal.payments', 'Payments', 'finance'],
             ['portal.documents', 'Documents', 'reports'],
             ['portal.support', 'Support', 'feedback'],
@@ -77,6 +77,41 @@
         @endforeach
     </nav>
 </header>
+
+@if ($myRealtor)
+    {{-- Always visible, on every page.
+
+         A buyer browsing a ₦90m flat has questions the software cannot answer
+         — is the road tarred, what are the service charges, can I see it on
+         Saturday. Putting the person who CAN answer behind a Support tab
+         means the question gets asked to nobody. --}}
+    <div class="realtor-bar">
+        <div class="realtor-bar__in">
+            <x-avatar :name="$myRealtor->name" />
+
+            <div class="realtor-bar__who">
+                <span class="k">Your realtor</span>
+                <span class="v">{{ $myRealtor->name }}</span>
+            </div>
+
+            <span class="spacer"></span>
+
+            @if ($myRealtor->phone)
+                <a class="btn btn--sm btn--ghost" href="tel:{{ preg_replace('/\s+/', '', $myRealtor->phone) }}">
+                    <x-icon name="agent" size="13" /><span>{{ $myRealtor->phone }}</span>
+                </a>
+            @endif
+
+            <a class="btn btn--sm btn--ghost" href="mailto:{{ $myRealtor->email }}">
+                <x-icon name="mail" size="13" /><span class="realtor-bar__mail">{{ $myRealtor->email }}</span>
+            </a>
+
+            <a class="btn btn--sm btn--primary" href="{{ route('portal.support') }}" wire:navigate>
+                <x-icon name="send" size="13" /><span>Ask a question</span>
+            </a>
+        </div>
+    </div>
+@endif
 
 <main class="pt-main">{{ $slot }}</main>
 

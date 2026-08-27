@@ -16,11 +16,19 @@ class Payment extends Model
     protected $casts = [
         'due_at' => 'datetime', 'paid_at' => 'datetime', 'reminded_at' => 'datetime',
         'original_due_at' => 'datetime', 'amount' => 'float', 'restructured' => 'bool',
+        'recorded_at' => 'datetime',
     ];
 
     public function deal(): BelongsTo { return $this->belongsTo(Deal::class); }
 
     public function customer(): BelongsTo { return $this->belongsTo(Customer::class); }
+
+    public function investor(): BelongsTo { return $this->belongsTo(Customer::class, 'customer_id'); }
+
+    public function commitment(): BelongsTo { return $this->belongsTo(Deal::class, 'deal_id'); }
+
+    /** Who keyed it in. An offline transfer with no recorder cannot be disputed. */
+    public function recorder(): BelongsTo { return $this->belongsTo(User::class, 'recorded_by'); }
 
     /**
      * Status derived from the clock, not read from the stored column.
@@ -55,4 +63,15 @@ class Payment extends Model
     public function isSettled(): bool { return $this->liveStatus() === 'paid'; }
 
     public function isLate(): bool { return in_array($this->liveStatus(), ['overdue', 'due'], true); }
+
+    /** Label for the investor's progress table. */
+    public function statusLabel(): string
+    {
+        return [
+            'paid' => 'Paid',
+            'due' => 'Due now',
+            'overdue' => 'Overdue',
+            'scheduled' => 'Scheduled',
+        ][$this->liveStatus()] ?? 'Scheduled';
+    }
 }

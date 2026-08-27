@@ -185,6 +185,24 @@ class TemplateNarrator implements NarratorContract
         }
     }
 
+    /**
+     * Always null — and that is the correct answer, not a stub.
+     *
+     * Everything else in this class is a grammar with computed figures written
+     * into it, which works precisely because the shape of each sentence is
+     * known in advance. A free-form question has no such shape. Pattern-
+     * matching one against a fact sheet would produce confident nonsense on
+     * the questions it half-recognised, which is worse than the honest card
+     * AskEngine already renders when this returns null.
+     *
+     * So with no model configured, Ask NexABI falls back to saying the data is
+     * not there — which is exactly what it did before this method existed.
+     */
+    public function answer(string $question, array $facts): ?string
+    {
+        return null;
+    }
+
     public function brief(array $h, array $insights): string
     {
         $b = fn ($s) => $this->b($s);

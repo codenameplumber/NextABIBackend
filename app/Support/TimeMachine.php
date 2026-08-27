@@ -10,6 +10,7 @@ use App\Models\Feedback;
 use App\Models\Lead;
 use App\Models\Payment;
 use App\Models\Property;
+use App\Engine\Metrics;
 use App\Models\Tenant;
 use Illuminate\Support\Facades\DB;
 
@@ -64,7 +65,9 @@ class TimeMachine
 
         $this->r = new Rng(crc32($this->tenant->id.':'.$days.':'.Lead::count()));
 
-        return DB::transaction(function () use ($days) {
+        // Whatever happens to the transaction, the cached figures describe the
+        // world before the jump and have to go.
+        $summary = DB::transaction(function () use ($days) {
             $this->ageEverything($days);
 
             $summary = ['days' => $days, 'newLeads' => 0, 'advanced' => 0, 'lost' => 0,
@@ -80,6 +83,10 @@ class TimeMachine
 
             return $summary;
         });
+
+        Metrics::for($this->tenant)->flush();
+
+        return $summary;
     }
 
     /* ----------------------------------------------------------- ageing */

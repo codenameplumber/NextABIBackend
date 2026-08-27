@@ -7,7 +7,7 @@
 
 <div class="stack">
 
-    <x-page-head title="Customers"
+    <x-page-head title="Investors"
                  :sub="Fmt::num($c['total']).' customers · '.Fmt::moneyShort($c['ltv']).' lifetime value · '.number_format($c['satisfaction'], 2).' average satisfaction'">
         <x-slot:actions>
             <a class="btn btn--ghost"
@@ -18,9 +18,25 @@
     </x-page-head>
 
     <x-page-note>
-        Everyone who has bought from you, sorted by lifetime value. Satisfaction sits alongside
-        so you can see **who is at risk of not coming back**.
+        Everyone registered, sorted by lifetime value. Satisfaction sits alongside so you can see
+        **who is at risk of not coming back**.
     </x-page-note>
+
+    {{-- The unassigned queue. An investor with no realtor cannot have a
+         commitment approved, so this blocks somebody else s work. --}}
+    @if ($unassignedCount > 0)
+        <div class="blocker">
+            <x-icon name="warn" size="15" />
+            <span>
+                <b>{{ $unassignedCount }}</b>
+                {{ $unassignedCount === 1 ? 'investor has' : 'investors have' }}
+                no realtor attached. Their commitments cannot be approved until they do.
+            </span>
+            <button class="btn btn--sm" wire:click="toggleUnassigned">
+                <span>{{ $filter === 'unassigned' ? 'Show everyone' : 'Show them' }}</span>
+            </button>
+        </div>
+    @endif
 
     <div class="grid g-4">
         <x-kpi label="Customers" :value="$c['total']" format="count" ico="customers"
@@ -95,6 +111,7 @@
                         <th class="is-sortable right {{ $sort === 'ltv' ? 'is-sorted' : '' }}" wire:click="sortBy('ltv')">
                             <span>Lifetime value</span><span class="sort">{{ $sortIcon('ltv') }}</span>
                         </th>
+                        <th>Realtor</th>
                         <th class="right">Deals</th>
                         <th class="is-sortable right {{ $sort === 'satisfaction' ? 'is-sorted' : '' }}"
                             wire:click="sortBy('satisfaction')">
@@ -123,6 +140,28 @@
                             </td>
                             <td><x-badge :kind="$segKind($r->segment)">{{ Fmt::titleCase($r->segment) }}</x-badge></td>
                             <td class="right"><span class="num semi">{{ Fmt::moneyShort($r->ltv) }}</span></td>
+                            {{-- Assigning happens here rather than on another
+                                 screen: two clicks in one place beats a correct
+                                 message pointing somewhere else. --}}
+                            <td wire:click.stop>
+                                @if ($r->realtor)
+                                    <div class="t-sm">{{ $r->realtor->name }}</div>
+                                    <div class="t-xs t-3 mono">{{ $r->realtor->code }}</div>
+                                @else
+                                    <div class="row-2" style="gap:var(--s-2)">
+                                        <select class="input" style="min-width:150px;max-width:190px"
+                                                wire:model="assignTo.{{ $r->id }}">
+                                            <option value="">Unassigned</option>
+                                            @foreach ($realtors as $rt)
+                                                <option value="{{ $rt->id }}">{{ $rt->name }}</option>
+                                            @endforeach
+                                        </select>
+                                        <button class="btn btn--sm" wire:click="assignRealtor({{ $r->id }})">
+                                            <span>Assign</span>
+                                        </button>
+                                    </div>
+                                @endif
+                            </td>
                             <td class="right"><span class="num">{{ Fmt::num($r->won_deals) }}</span></td>
                             <td class="right">
                                 @if ($r->satisfaction === null)

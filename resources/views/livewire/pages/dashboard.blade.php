@@ -107,6 +107,36 @@
          and are pointed at by the strip below. Eight numbers at the top of a
          dashboard is not twice the information, it is half the attention. --}}
 
+    {{-- ────────────────────────────────────────── 3a. platform scale ──
+         How big the platform is, before how the business is doing. Counted
+         live rather than read through the metric cache — a realtor approved a
+         minute ago should not be missing for ten.                        --}}
+
+    <x-sec-label title="The platform" note="Right now" />
+
+    <div class="grid g-4">
+        <x-kpi label="Total users" :value="$platform['users']" format="count" ico="customers"
+               :note="Fmt::num($platform['investors']).' investors'"
+               :href="route('app.customers')" />
+
+        <x-kpi label="Realtors" :value="$platform['realtors']" format="count" ico="agent"
+               :note="$platform['realtorsPending'] > 0
+                    ? $platform['realtorsPending'].' awaiting approval'
+                    : 'All approved'"
+               :href="route('app.realtors')" />
+
+        <x-kpi label="Assets sold" :value="$platform['soldValue']" format="money" ico="property"
+               :note="Fmt::num($platform['commitments']).' commitments approved'"
+               :href="route('app.commitments')" />
+
+        <x-kpi label="Awaiting approval" :value="$platform['commitmentsPending']" format="count"
+               ico="clock" invert
+               :note="$platform['unassigned'] > 0
+                    ? $platform['unassigned'].' investors need a realtor'
+                    : 'Nothing blocked'"
+               :href="route('app.commitments')" />
+    </div>
+
     <x-sec-label title="The money" note="Trailing 90 days" />
 
     <div class="grid g-4">
@@ -146,7 +176,7 @@
                 $band = $entry['worst']->band ?? 'clear';
             @endphp
             <a class="health-cell is-{{ $band }}"
-               href="{{ $entry ? route('app.insights', ['area' => $key]) : route('app.'.$key) }}"
+               href="{{ $entry ? route('app.insights', ['area' => $key]) : route(InsightEngine::areaRoute($key)) }}"
                wire:navigate
                title="{{ $entry ? $entry['worst']->title : 'Nothing flagged in '.$label }}">
                 @if ($entry)<span class="health-cell__n">{{ $entry['count'] }}</span>@endif

@@ -7,10 +7,11 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * The portal is for buyers.
+ * The investor area.
  *
- * Staff are sent to the console rather than shown an error — someone landing
- * on the wrong door should be walked to the right one.
+ * Anyone signed in who is not an investor is sent to their own area. An
+ * investor with no linked record is a broken account rather than a wrong turn,
+ * so that one is refused outright — there is nothing to show them.
  */
 class EnsureClient
 {
@@ -18,12 +19,12 @@ class EnsureClient
     {
         $user = $request->user();
 
-        if ($user->isStaff()) {
-            return redirect()->route('app.dashboard');
+        if (! $user->isInvestor()) {
+            return redirect()->route($user->homeRoute());
         }
 
         if (! $user->customer_id) {
-            abort(403, 'This account is not linked to a customer record.');
+            abort(403, 'This account is not linked to an investor record.');
         }
 
         return $next($request);
