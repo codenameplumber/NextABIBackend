@@ -20,4 +20,30 @@ return [
 
     'stock_photos' => env('NEXABI_STOCK_PHOTOS', true),
 
+    /*
+    |---------------------------------------------------------------------------
+    | Where uploaded files go
+    |---------------------------------------------------------------------------
+    |
+    | Property photographs and promotional artwork. Null means "write straight
+    | into public/", which is right on a single machine: the file is served the
+    | moment it lands, with no `storage:link` step to forget.
+    |
+    | It is WRONG on any host with an ephemeral filesystem — Laravel Cloud, Fly,
+    | Heroku, a container that gets replaced on deploy. There, everything an
+    | operator uploaded disappears at the next release, silently, and the only
+    | symptom is broken images on listings somebody added last week.
+    |
+    | So set NEXABI_UPLOAD_DISK to a durable disk in production (`s3` covers
+    | any S3-compatible object storage, which is what Laravel Cloud provides).
+    |
+    | The value stored in the DATABASE is identical either way — a relative path
+    | like `img/properties/20260828-a1b2c3.jpg`. Only the resolution differs, so
+    | the same rows work on both, and moving between them is a config change
+    | plus a file copy rather than a data migration.
+    |
+    */
+
+    'upload_disk' => env('NEXABI_UPLOAD_DISK'),
+
 ];

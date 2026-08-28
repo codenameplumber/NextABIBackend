@@ -105,9 +105,9 @@
         @error('agreed') <div class="err">{{ $message }}</div> @enderror
 
         <button class="btn btn--primary" style="width:100%;justify-content:center"
-                wire:click="commit" wire:loading.attr="disabled">
-            <span wire:loading.remove wire:target="commit">Commit to this property</span>
-            <span wire:loading wire:target="commit">Submitting…</span>
+                wire:click="submitCommitment" wire:loading.attr="disabled">
+            <span wire:loading.remove wire:target="submitCommitment">Commit to this property</span>
+            <span wire:loading wire:target="submitCommitment">Submitting…</span>
         </button>
     </aside>
 </div>

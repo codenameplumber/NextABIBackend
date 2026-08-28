@@ -142,7 +142,7 @@ class Properties extends Component
         $this->images = array_values(array_diff_key($this->images, [$index => null]));
     }
 
-    public function removeUpload(int $index): void
+    public function discardUpload(int $index): void
     {
         unset($this->uploads[$index]);
         $this->uploads = array_values($this->uploads);

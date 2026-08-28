@@ -164,7 +164,7 @@
                                     <img src="{{ $up->temporaryUrl() }}" alt="">
                                 @endif
                                 <figcaption>ready to save</figcaption>
-                                <button type="button" class="imgpick__x" wire:click="removeUpload({{ $i }})"
+                                <button type="button" class="imgpick__x" wire:click="discardUpload({{ $i }})"
                                         aria-label="Remove this upload">
                                     <x-icon name="x" size="12" />
                                 </button>

@@ -339,4 +339,53 @@ class OperatorToolsTest extends TestCase
         $this->assertFileExists($canary);
         @unlink($canary);
     }
+
+    /* ============================================ ephemeral hosts */
+
+    /**
+     * On a host whose filesystem does not survive a deploy, writing into
+     * public/ loses every uploaded photograph at the next release — silently,
+     * with broken images on listings somebody added last week as the only
+     * symptom. Setting a disk has to move the write AND the URL together.
+     */
+    public function test_uploads_go_to_a_durable_disk_when_one_is_configured(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('uploads');
+        config(['nexabi.upload_disk' => 'uploads']);
+
+        $path = ImageStore::put(
+            UploadedFile::fake()->image('unit.jpg', 800, 600),
+            'img/properties',
+        );
+
+        // The value written to the database is the same relative path it would
+        // be locally — that is what lets one dataset work in both places.
+        $this->assertStringStartsWith('img/properties/', $path);
+        $this->assertFileDoesNotExist(public_path($path), 'It still wrote into public/.');
+        \Illuminate\Support\Facades\Storage::disk('uploads')->assertExists($path);
+
+        // And the URL has to follow the bytes, or the row points at nothing.
+        $this->assertSame(
+            \Illuminate\Support\Facades\Storage::disk('uploads')->url($path),
+            \App\Support\PropertyPhotos::resolve($path),
+        );
+
+        ImageStore::forget($path, 'img/properties');
+        \Illuminate\Support\Facades\Storage::disk('uploads')->assertMissing($path);
+    }
+
+    public function test_a_remote_url_is_untouched_whichever_disk_is_configured(): void
+    {
+        // Agency photography hosted elsewhere must not be rewritten into a
+        // bucket path just because a disk happens to be set.
+        foreach ([null, 'uploads'] as $disk) {
+            \Illuminate\Support\Facades\Storage::fake('uploads');
+            config(['nexabi.upload_disk' => $disk]);
+
+            $this->assertSame(
+                'https://cdn.test/a.jpg',
+                \App\Support\PropertyPhotos::resolve('https://cdn.test/a.jpg'),
+            );
+        }
+    }
 }

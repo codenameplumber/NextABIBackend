@@ -395,9 +395,20 @@
    and the grid sees the sections it was written for.
    ========================================================================= */
 
-.pt-main > [wire\:id],
-.pt-main > [data-wire-id],
-.pt-main > div:only-child { display: contents; }
+/* :not([class]) is doing real work here.
+
+   A component whose root carries its own class carries its own LAYOUT — the
+   commit page is `.commit`, a two-column grid with a sticky terms panel beside
+   it. Matching every wire root regardless of class meant this selector, at
+   (0,2,0), outranked `.commit` at (0,1,0), and display:contents deleted that
+   grid entirely: the terms panel dropped underneath the description and the
+   page read as broken.
+
+   So only a BARE root is dissolved. A classed root is a component that has
+   already decided how it lays itself out, and this must not overrule it. */
+.pt-main > [wire\:id]:not([class]),
+.pt-main > [data-wire-id]:not([class]),
+.pt-main > div:only-child:not([class]) { display: contents; }
 
 /* With the gap doing the work, the console's negative pulls are no longer
    correcting for anything — they are just collision. */

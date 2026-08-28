@@ -147,7 +147,7 @@ class Materials extends Component
         );
     }
 
-    public function toggle(int $id): void
+    public function togglePublished(int $id): void
     {
         $m = PromotionalMaterial::findOrFail($id);
         $m->forceFill(['active' => ! $m->active])->save();

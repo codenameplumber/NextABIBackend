@@ -189,7 +189,7 @@
                             <x-icon name="settings" size="14" />
                         </button>
 
-                        <button class="btn btn--sm btn--ghost" wire:click="toggle({{ $m->id }})">
+                        <button class="btn btn--sm btn--ghost" wire:click="togglePublished({{ $m->id }})">
                             <span>{{ $m->active ? 'Withdraw' : 'Publish' }}</span>
                         </button>
 

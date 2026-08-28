@@ -43,7 +43,7 @@ class Commit extends Component
         $this->months = in_array(12, $options, true) ? 12 : $options[0];
     }
 
-    public function commit(): void
+    public function submitCommitment(): void
     {
         if (! $this->agreed) {
             $this->addError('agreed', 'Please confirm you have read the terms.');

@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
@@ -29,7 +30,25 @@ final class ImageStore
     public const DOCUMENT_EXTENSIONS = ['pdf', 'mp4', 'webm'];
 
     /**
-     * Move an upload into public/{$folder} and return its relative path.
+     * The durable disk uploads go to, or null for "write into public/".
+     *
+     * Read through a method rather than inlined so every path — write, delete
+     * and resolve — asks the same question and cannot drift apart.
+     */
+    public static function disk(): ?string
+    {
+        $disk = config('nexabi.upload_disk');
+
+        return filled($disk) ? (string) $disk : null;
+    }
+
+    /**
+     * Store an upload and return the path to record in the database.
+     *
+     * That path is the SAME either way — `img/properties/20260828-a1b2.jpg` —
+     * whether the bytes landed in public/ or in object storage. Only
+     * PropertyPhotos::resolve() knows the difference, which is what lets one
+     * database work in both places.
      *
      * The stored name is generated rather than taken from the upload. A file
      * called "3 bed, Lekki (FINAL).jpg" produces a URL nobody can paste, and a
@@ -45,19 +64,14 @@ final class ImageStore
         }
 
         $folder = trim($folder, '/');
-        $directory = public_path($folder);
-
-        if (! is_dir($directory)) {
-            mkdir($directory, 0o755, recursive: true);
-        }
 
         // Prefixed with the date so the folder stays browsable by eye when
         // somebody eventually has to go and find one on the server.
         $name = now()->format('Ymd').'-'.Str::random(12).'.'.$extension;
-        $target = $directory.DIRECTORY_SEPARATOR.$name;
+        $path = $folder.'/'.$name;
 
         /**
-         * Copied through, not moved.
+         * Read once, written once.
          *
          * UploadedFile::move() ultimately calls move_uploaded_file(), which by
          * design only accepts a file PHP itself received over HTTP in this
@@ -69,11 +83,29 @@ final class ImageStore
          * file, and works whichever disk the temporary one is parked on.
          * Livewire sweeps its own temp directory, so nothing is left behind.
          */
-        if (file_put_contents($target, $file->get()) === false) {
+        $contents = $file->get();
+
+        if ($disk = self::disk()) {
+            // Explicitly public: an object store defaults to private, and a
+            // listing photograph nobody can load is the same as no photograph.
+            if (! Storage::disk($disk)->put($path, $contents, 'public')) {
+                throw new \RuntimeException("Could not write the upload to the {$disk} disk.");
+            }
+
+            return $path;
+        }
+
+        $directory = public_path($folder);
+
+        if (! is_dir($directory)) {
+            mkdir($directory, 0o755, recursive: true);
+        }
+
+        if (file_put_contents($directory.DIRECTORY_SEPARATOR.$name, $contents) === false) {
             throw new \RuntimeException("Could not write the upload to {$folder}.");
         }
 
-        return $folder.'/'.$name;
+        return $path;
     }
 
     /**
@@ -95,8 +127,20 @@ final class ImageStore
             return;
         }
 
-        // Belt and braces: a path that traverses out of public/ never reaches
-        // unlink even if it somehow satisfied the prefix check above.
+        // A traversal that satisfied the prefix check above — "img/properties/
+        // ../../.env" — must not reach either branch.
+        if (str_contains($path, '..')) {
+            return;
+        }
+
+        if ($disk = self::disk()) {
+            Storage::disk($disk)->delete($path);
+
+            return;
+        }
+
+        // Belt and braces on the local branch too: resolve the real path and
+        // confirm it is still inside the folder before unlinking anything.
         $full = realpath(public_path($path));
         $root = realpath(public_path($folder));
 

@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Property;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Real photographs for the catalogue.
@@ -212,6 +213,22 @@ final class PropertyPhotos
             return $image;
         }
 
-        return asset(ltrim($image, '/'));
+        $image = ltrim($image, '/');
+
+        /**
+         * A relative path means "we stored this" — but WHERE depends on the
+         * environment, not on the row.
+         *
+         * The database holds the same value on a laptop and on Laravel Cloud;
+         * only this line differs. That is deliberate: it means a dataset can
+         * move between the two without rewriting a single `images` column, and
+         * switching an existing deployment to object storage is a config change
+         * plus a file copy rather than a data migration.
+         */
+        if ($disk = ImageStore::disk()) {
+            return Storage::disk($disk)->url($image);
+        }
+
+        return asset($image);
     }
 }

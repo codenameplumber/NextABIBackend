@@ -11,10 +11,23 @@ Laravel 13 · Livewire 4 · MySQL 9 · PHP 8.3 · OpenAI · Mailtrap.
 
 ## Submission documents
 
-Three published pages, each generated from figures read off the running system:
+Every figure in these is read off the running system, not written by hand.
+
+**PDFs** are in `public/downloads/` and served at `/downloads/…` once the app is running:
+
+| File | |
+|---|---|
+| `NexABI-Submission.pdf` | The eight submission requirements, one page each |
+| `NexABI-Roles-Guide.pdf` | What each kind of user can and cannot do |
+| `NexABI-Access-Keys.pdf` | All twelve seeded accounts |
+
+The figures in them are a snapshot. After a reseed, regenerate from the live pages below (Ctrl+P → Save as PDF) so the numbers match the database a judge will be looking at.
+
+The same three pages, live:
 
 | | What it covers |
 |---|---|
+| **[Submission document](https://claude.ai/code/artifact/312d983b-b419-471f-b110-ca544b7c7447)** | The eight requirements as a print-ready document — cover, contents and one page per section. Export to PDF from the browser |
 | **[Technical dossier](https://claude.ai/code/artifact/05b89062-f989-412c-b90c-8d087f82b52c)** | The eight submission requirements in order — problem, prototype, workflow, tools and models, sample inputs and outputs, test evidence, the demo path, and business impact |
 | **[Three doors in](https://claude.ai/code/artifact/d987ee91-a73c-4aa7-907b-4f4c372324ff)** | What each kind of user can do — visitor, buyer, realtor, operator — and what each deliberately cannot |
 | **[Access keys](https://claude.ai/code/artifact/af213ab7-96ee-4568-b740-99d7b732abf3)** | All twelve seeded accounts with one-click copy |
@@ -506,20 +519,31 @@ stops.
 
 ### Uploaded files
 
-Property photographs go to `public/img/properties/`, promotional assets to
-`public/downloads/materials/`. Both are written under `public/` directly rather
-than to the `public` **disk**, which points at `storage/app/public` and is only
-reachable over HTTP once `php artisan storage:link` has been run — a step that
-is easy to miss, produces no error when missed, and surfaces as every uploaded
-photograph 404ing on the one machine where the deploy script forgot it.
+Property photographs and promotional artwork. Where they land is one setting:
 
-`properties.images` holds either kind of value: a relative path from an upload,
-or a full URL to photography the agency already hosts. `PropertyPhotos::resolve()`
-decides which at render time, so an agency with its stock already shot and on a
-CDN never has to re-upload it.
+| `NEXABI_UPLOAD_DISK` | Behaviour |
+|---|---|
+| unset *(default)* | Written into `public/img/properties/` and `public/downloads/materials/` and served immediately — no `storage:link` to forget |
+| `s3` | Written to that disk instead, and the URL follows |
 
-Back both directories up. They are the only application state that is not in
-the database.
+**Set it on any host with an ephemeral filesystem** — Laravel Cloud, Fly, Heroku,
+anything containerised. Without it every file an operator uploads is lost at the
+next deploy, silently, and the only symptom is a broken image on a listing
+somebody added last week.
+
+The value stored in the **database is identical either way** — a relative path
+like `img/properties/20260828-a1b2c3.jpg`. Only `PropertyPhotos::resolve()`
+knows the difference, so one dataset works in both places and switching an
+existing deployment over is a config change plus a file copy rather than a data
+migration. A full URL in `properties.images` is passed through untouched
+regardless, so agency photography hosted elsewhere is unaffected.
+
+With more than one container, Livewire's *temporary* upload disk has to be
+shared too — `LIVEWIRE_TEMPORARY_FILE_UPLOAD_DISK=s3` — or a form submitted on
+one container cannot find the file parked by another.
+
+Running locally with no disk set, those two directories are the only application
+state that is not in the database. Back them up.
 
 ### Queue workers
 
