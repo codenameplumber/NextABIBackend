@@ -24,7 +24,7 @@
                  msg="Commission accrues the moment a commitment you brought in is approved." />
     @else
         <x-card title="Statement" sub="Every sale, with the rate that was applied">
-            <div class="table-wrap">
+            <div class="tablewrap">
                 <table class="table">
                     <thead>
                         <tr>

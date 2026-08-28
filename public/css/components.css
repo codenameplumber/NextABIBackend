@@ -1920,3 +1920,13 @@ a.optrow:focus-visible { outline: 2px solid var(--brand-500); outline-offset: 2p
 }
 
 .fgrid--full { grid-column: 1 / -1; }
+
+/* A defensive alias for a class name that does not exist.
+
+   Three realtor views shipped `table-wrap` (hyphenated) against a stylesheet
+   that only ever defined `tablewrap`. The result was a table with no scroll
+   container, which does not look broken on a desktop and drags the entire page
+   sideways on a phone — a failure mode that is invisible in the only place
+   most people check. The views are fixed; this stays so the next stray
+   hyphen degrades to "works" rather than to "silently horizontal". */
+.table-wrap { overflow-x: auto; }

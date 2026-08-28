@@ -113,7 +113,7 @@
                  msg="Share your enquiry link, or record someone you have spoken to." />
     @else
         <x-card>
-            <div class="table-wrap">
+            <div class="tablewrap">
                 <table class="table">
                     <thead>
                         <tr>

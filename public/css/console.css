@@ -87,3 +87,100 @@
 [wire\:loading] { display: none; }
 
 .stack-6 > * + * { margin-top: var(--s-6); }
+
+/* =========================  THE CONSOLE ON A PHONE  ======================
+   `.app` was a hard two-column grid — a 260px sidebar and whatever was left —
+   at every width, with no breakpoint anywhere. On a 390px phone that leaves
+   130px of content, and the topbar alone measured 795px, so every console page
+   scrolled sideways to twice the width of the screen.
+
+   Below 900px the sidebar leaves the flow entirely and becomes a drawer over
+   the page. Collapsing it to the 64px rail instead was the tempting fix and is
+   the wrong one: a rail of unlabelled icons still eats a sixth of a phone
+   screen, permanently, to show navigation nobody is looking at while they read
+   a table.
+   ========================================================================= */
+
+@media (max-width: 900px) {
+
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+    /* The rail preference is a desktop preference. Honouring it here would
+       reserve 64px on a phone for no reason. */
+    transition: none;
+  }
+  .app.is-collapsed { grid-template-columns: minmax(0, 1fr); }
+
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(292px, 86vw);
+    z-index: calc(var(--z-nav) + 2);
+    transform: translateX(-100%);
+    transition: transform var(--base) var(--ease);
+    box-shadow: 12px 0 40px rgba(0, 0, 0, .28);
+  }
+
+  .app.is-nav-open .sidebar { transform: translateX(0); }
+
+  /* Whatever the rail preference is, the drawer always shows full labels —
+     it is the only navigation available at this width. */
+  .app.is-collapsed .brandmark__text,
+  .app.is-collapsed .nav__label,
+  .app.is-collapsed .nav__item span,
+  .app.is-collapsed .nav__count,
+  .app.is-collapsed .sidebar__foot .btn span { display: revert; }
+  .app.is-collapsed .nav__item { justify-content: flex-start; padding: 8px var(--s-3); }
+  .app.is-collapsed .brandmark { justify-content: flex-start; padding: 0 var(--s-4); }
+
+  .nav-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-nav) + 1);
+    border: 0;
+    padding: 0;
+    background: rgba(8, 8, 10, .45);
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--base) var(--ease);
+  }
+
+  .app.is-nav-open .nav-scrim { opacity: 1; pointer-events: auto; }
+
+  /* ---------------------------------------------------------- topbar ---
+     Nine controls in a non-wrapping flex row. Four of them are desktop
+     conveniences: the command palette (Ctrl+K has no meaning on a phone), the
+     Time Machine, the role switcher, and the rules between them. Hiding those
+     leaves the four that matter — menu, theme, who you are, and sign out. */
+
+  .topbar { padding: 0 var(--s-3); gap: var(--s-2); }
+  /* Targeted by wire:name rather than by class — these are Livewire roots
+     whose own classes are layout utilities that appear all over the page. */
+  .topbar .vdivider,
+  .topbar [wire\:name="palette"],
+  .topbar [wire\:name="time-machine"],
+  .topbar form[action$="/role"] { display: none; }
+
+  .usermenu { padding-left: 0; gap: var(--s-2); }
+
+  .view { padding: var(--s-4) var(--s-4) var(--s-8); }
+}
+
+/* Small phones: the brand wordmark in the drawer and the page-head actions
+   are the next things to give way. */
+@media (max-width: 420px) {
+  .view { padding: var(--s-3) var(--s-3) var(--s-7); }
+  .page-head { gap: var(--s-3); }
+}
+
+/* The drawer slide is motion over content, which is exactly the kind somebody
+   with a vestibular disorder asked not to see. */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar, .nav-scrim { transition: none; }
+}
+
+/* Above the breakpoint the scrim must never intercept a click. */
+@media (min-width: 901px) {
+  .nav-scrim { display: none; }
+}

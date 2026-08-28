@@ -159,10 +159,20 @@ h4 { font-size: var(--t-md); }
 .g-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .g-auto { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 
-.stack   { display: grid; gap: var(--s-6); }
-.stack-4 { display: grid; gap: var(--s-4); }
-.stack-2 { display: grid; gap: var(--s-2); }
-.stack-1 { display: grid; gap: var(--s-1); }
+/* minmax(0, 1fr) rather than the implicit `auto`.
+
+   A single-column grid with no declared track gets `auto`, which sizes to its
+   WIDEST content and refuses to shrink below it. Put a 900px table inside a
+   .stack on a 390px phone and the stack becomes 900px wide, dragging the whole
+   page sideways — even though the table sits in a .tablewrap that would have
+   scrolled it perfectly well on its own.
+
+   Declaring the track with a zero minimum is what lets the column shrink and
+   hands the overflow back to the wrapper that was built to handle it. */
+.stack   { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+.stack-4 { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+.stack-2 { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-2); }
+.stack-1 { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-1); }
 
 /* ===========================  TEXT UTILITIES  ============================= */
 

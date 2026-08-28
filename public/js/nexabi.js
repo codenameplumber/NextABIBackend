@@ -121,7 +121,25 @@ export function toast({ kind = '', title = '', msg = '', ms = 4600 }) {
 
 /* --------------------------------------------------------------- chrome */
 
+/**
+ * Everything in here binds to `document`, so it must bind exactly once.
+ *
+ * boot() runs on DOMContentLoaded AND on every livewire:navigated, and without
+ * this guard each soft navigation added another copy of these listeners. Two
+ * copies of a TOGGLE cancel each other out: the sidebar button appeared to do
+ * nothing at all after the first client-side navigation, on desktop as well as
+ * on a phone. The only visible trace was the class attribute being rewritten
+ * to an identical value.
+ *
+ * Re-running the DOM-scanning parts of boot() after a navigation is correct and
+ * still happens. It is only the delegated listeners that must not stack.
+ */
+let chromeBound = false;
+
 function bindChrome() {
+  if (chromeBound) return;
+  chromeBound = true;
+
   document.addEventListener('click', (e) => {
     const t = e.target.closest('[data-theme-toggle]');
     if (t) { e.preventDefault(); toggleTheme(); return; }
@@ -130,10 +148,44 @@ function bindChrome() {
     if (c) {
       e.preventDefault();
       const app = document.getElementById('app');
+
+      /* The same button does two different jobs.
+
+         On a wide screen it narrows the sidebar to a rail, and that choice is
+         remembered in a cookie because it is a preference. On a phone the
+         sidebar is off-canvas and the button opens it — a drawer that stayed
+         open across navigations would cover the page you just navigated to,
+         so that state is deliberately NOT persisted. */
+      if (isNarrow()) {
+        app.classList.toggle('is-nav-open');
+        return;
+      }
+
       app.classList.toggle('is-collapsed');
       document.cookie = `nexabi_rail=${app.classList.contains('is-collapsed') ? 1 : 0};path=/;max-age=31536000;samesite=lax`;
     }
+
+    // The scrim, and any nav link inside the open drawer.
+    if (e.target.closest('[data-nav-close]') ||
+        (isNarrow() && e.target.closest('.sidebar a'))) {
+      document.getElementById('app')?.classList.remove('is-nav-open');
+    }
   });
+
+  // Escape closes it, and so does growing past the breakpoint — otherwise the
+  // drawer state survives a rotation and the desktop layout renders with it on.
+  addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') document.getElementById('app')?.classList.remove('is-nav-open');
+  });
+
+  addEventListener('resize', () => {
+    if (!isNarrow()) document.getElementById('app')?.classList.remove('is-nav-open');
+  });
+}
+
+/** The breakpoint the console shell collapses at. Kept in step with console.css. */
+function isNarrow() {
+  return window.matchMedia('(max-width: 900px)').matches;
 }
 
 function bindKeys() {

@@ -27,6 +27,12 @@
 </head>
 <body>
     <div id="app" class="app {{ $rail ? 'is-collapsed' : '' }}">
+        {{-- Below 900px the sidebar leaves the flow and slides over the page,
+             so it needs something to close it that is not the menu button.
+             A real element rather than a pseudo, because it has to be
+             clickable and reachable by keyboard. --}}
+        <button class="nav-scrim" data-nav-close tabindex="-1" aria-label="Close menu"></button>
+
         <aside class="sidebar">
             @livewire('nav')
         </aside>

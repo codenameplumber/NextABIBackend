@@ -73,7 +73,7 @@
         <x-empty title="Nothing yet"
                  msg="Share your registration link, and anyone who signs up through it appears here." />
     @else
-        <div class="table-wrap">
+        <div class="tablewrap">
             <table class="table">
                 <thead>
                     <tr>

@@ -59,7 +59,11 @@
 .pt-main {
   max-width: 1120px; margin-inline: auto;
   padding: var(--s-6) var(--s-6) var(--s-10);
-  display: grid; gap: var(--s-5);
+  display: grid;
+  /* Same reason as the .stack utilities: without a declared track this column
+     sizes to its widest child and the whole shell scrolls sideways. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s-5);
 }
 
 @media (max-width: 680px) {
@@ -426,3 +430,89 @@
 /* A page that groups its own content keeps its rhythm rather than inheriting
    the shell's — the sections inside it are a set, not siblings of the rest. */
 .pt-main > .stack { display: grid; gap: var(--s-6); }
+
+/* ==================  THE PORTAL AND REALTOR AREA ON A PHONE  =============
+   Both shells share `.pt-head`, and both overflowed for the same reason: the
+   header is a single non-wrapping flex row carrying the brand, a theme
+   toggle, an identity block with a full name AND email address, and a
+   "Sign out" button. At 390px that row measured 405px, so every page in both
+   areas scrolled sideways.
+
+   The fix is not to shrink it. It is to decide what a person on a phone
+   actually needs from a header: who they are (the avatar is enough), and a
+   way out.
+   ========================================================================= */
+
+@media (max-width: 720px) {
+
+  .pt-head__top {
+    flex-wrap: wrap;
+    row-gap: var(--s-2);
+    padding-inline: var(--s-4);
+  }
+
+  /* The email is the widest thing in the header and the least useful — the
+     person reading it knows their own address. The name goes too: the avatar
+     already answers "am I signed in as me". */
+  .pt-head__top .t-xs,
+  .pt-head__top .t-sm.semi { display: none; }
+
+  /* With the text gone the divider and its padding are marking nothing. */
+  .pt-head__top .row-2[style*="border-left"] {
+    border-left: 0 !important;
+    padding-left: 0 !important;
+    margin-left: 0 !important;
+  }
+
+  /* "Client portal" / "Realtor" under the wordmark is chrome, not wayfinding —
+     the navigation directly beneath says where you are. */
+  .pt-head__top .brand-tag { display: none; }
+
+  /* The nav is the one thing that must stay reachable, so it scrolls sideways
+     on its own rather than wrapping into three stacked rows that push the
+     page content below the fold. */
+  .pt-nav {
+    overflow-x: auto;
+    scrollbar-width: none;
+    flex-wrap: nowrap;
+    padding-inline: var(--s-4);
+  }
+  .pt-nav::-webkit-scrollbar { display: none; }
+  .pt-nav a { white-space: nowrap; flex: none; }
+
+  .pt-main { padding: var(--s-5) var(--s-4) var(--s-8); gap: var(--s-4); }
+
+  /* The realtor's code chip carries a full registration URL. It has to stay —
+     it is their livelihood — but it must not set the width of the header. */
+  .code-chip { max-width: 100%; overflow: hidden; }
+  .code-chip__val { overflow: hidden; text-overflow: ellipsis; }
+
+  /* The buyer's realtor bar: four controls including an email address. Keep
+     the call and message buttons, which are what a phone is for. */
+  .realtor-bar__in { padding-inline: var(--s-4); row-gap: var(--s-2); }
+
+  /* Two-column panels that assume desktop width. */
+  .pt-grid-2 { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Small phones: the sign-out label goes, leaving the icon buttons. */
+@media (max-width: 430px) {
+  .pt-main { padding-inline: var(--s-3); }
+  .pt-nav { padding-inline: var(--s-3); }
+  .pt-head__top { padding-inline: var(--s-3); }
+}
+
+/* ------------------------------------------------------------------------
+   Anything laid out as a fixed multi-column grid inside these areas. Written
+   once here rather than per-component, because the failure is always the same
+   one: a grid that was given a column count instead of a minimum width.
+   --------------------------------------------------------------------- */
+
+@media (max-width: 720px) {
+  .commit { grid-template-columns: minmax(0, 1fr); }
+  .terms { position: static; }
+  .recform__grid { grid-template-columns: minmax(0, 1fr); }
+  .dl { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+  .matgrid { grid-template-columns: minmax(0, 1fr); }
+  .pgrid { grid-template-columns: minmax(0, 1fr); }
+}
